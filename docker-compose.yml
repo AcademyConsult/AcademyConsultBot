@@ -1,0 +1,6 @@
+bot:
+  build: .
+  volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - ./config.json:/app/config.json:ro
+  user: www-data

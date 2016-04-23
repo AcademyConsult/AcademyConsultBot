@@ -1,0 +1,18 @@
+{
+	"token": "123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+	"timeout": 100,
+	"controllers": [
+		{
+			"name": "Name",
+			"uri": "https://example.com",
+			"username": "Username",
+			"password": "password",
+			"subscribers": [
+				12345
+			],
+			"whitelist": [
+				12345
+			]
+		}
+	]
+}
