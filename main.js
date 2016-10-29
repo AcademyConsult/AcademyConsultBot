@@ -1,5 +1,6 @@
 var telegram = require('telegram-bot-api');
 var unifi    = require('./unifi.js');
+var https    = require('https');
 var _        = require('underscore')._;
 
 var config = require('./config.json');
@@ -31,8 +32,19 @@ var commands = [
 	{
 		pattern: /\/details/,
 		handler: showDetails
+	},
+	{
+		pattern: /\/bewerbungen/,
+		handler: showApplicants
+	},
+	{
+		pattern: /\/countdown/,
+		handler: subscribe
 	}
 ];
+
+var subscribers = [];
+var countdown = 0;
 
 bot.on('message', function(message) {
 	if (message.text) {
@@ -161,3 +173,64 @@ _.each(controllers, function(controller, i) {
 		);
 	}
 });
+
+function _sendCountdown(chat_id) {
+	bot.sendMessage({
+		chat_id: chat_id,
+		text: 'Aktuelle Anzahl Bewerbungen: ' + countdown
+	});
+}
+
+setInterval(_updateCountdown, 30000);
+
+function _updateCountdown(callback) {
+	callback = callback || function() {};
+	var options = {
+		host: 'www.example.com',
+		port: 443,
+		path: '/path/to/data',
+		method: 'GET'
+	};
+
+	https.get(options, function(res) {
+		res.on('data', function(json) {
+			var data = JSON.parse(json);
+			var changed = countdown != data.count;
+			countdown = data.count;
+			if (changed) {
+				_.each(subscribers, _sendCountdown);
+			}
+			callback(changed);
+		});
+	});
+}
+
+function showApplicants(message) {
+	bot.sendChatAction({
+		chat_id: message.chat.id,
+		action: 'typing'
+	});
+	var chat_id = message.chat.id;
+	_updateCountdown(function(changed) {
+		if (!changed || subscribers.indexOf(chat_id) == -1) {
+			_sendCountdown(message.chat.id);
+		}
+	});
+}
+
+function subscribe(message) {
+	var index = subscribers.indexOf(message.chat.id);
+	if (index == -1) {
+		subscribers.push(message.chat.id);
+		bot.sendMessage({
+			chat_id: message.chat.id,
+			text: 'Du erhälst jetzt automatische Updates, wenn neue Bewerbungen rein kommen'
+		});
+	} else {
+		subscribers.splice(index, 1);
+		bot.sendMessage({
+			chat_id: message.chat.id,
+			text: 'Automatische Updates deaktiviert'
+		});
+	}
+}
