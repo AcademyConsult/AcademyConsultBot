@@ -1,6 +1,7 @@
 var telegram = require('telegram-bot-api');
 var unifi    = require('./unifi.js');
 var https    = require('https');
+var ical     = require('ical');
 var _        = require('underscore')._;
 
 var config = require('./config.json');
@@ -40,6 +41,10 @@ var commands = [
 	{
 		pattern: /\/countdown/,
 		handler: subscribe
+	},
+	{
+		pattern: /\/events/,
+		handler: showEvents
 	}
 ];
 
@@ -233,4 +238,39 @@ function subscribe(message) {
 			text: 'Automatische Updates deaktiviert'
 		});
 	}
+}
+
+function showEvents(message) {
+	bot.sendChatAction({
+		chat_id: message.chat.id,
+		action: 'typing'
+	});
+	ical.fromURL(config.events.ical, {}, function(err, data) {
+		var events = [];
+		var now = new Date();
+		_.each(_.chain(data)
+				.filter(function(event) {
+					return event.end > now
+				})
+				.sortBy('start')
+				.value().splice(0, 5),
+			function(event) {
+				var startTime = event.start.toLocaleTimeString('de').replace(/:00$/, '');
+				if (startTime == '00:00') {
+					startTime = '';
+				} else {
+					startTime = ' ' + startTime + ' Uhr';
+				}
+				events.push('*' + event.summary + '* ('
+					+ event.start.toLocaleDateString('de').replace(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/, '$3.$2.$1')
+					+ startTime
+				+ ')')
+			}
+		);
+		bot.sendMessage({
+			chat_id: message.chat.id,
+			parse_mode: 'Markdown',
+			text: "[Aktuelle AC-Events](" + config.events.html + "):\n" + events.join("\n")
+		});
+	});
 }

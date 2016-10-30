@@ -4,7 +4,8 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "telegram-bot-api": "^0.3.2",
+    "ical": "^0.5.0",
+    "telegram-bot-api": "^1.2.0",
     "underscore": "^1.8.3"
   },
   "devDependencies": {},

@@ -14,5 +14,9 @@
 				12345
 			]
 		}
-	]
+	],
+	"events": {
+		"ical": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.ics",
+		"html": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.html"
+	}
 }
