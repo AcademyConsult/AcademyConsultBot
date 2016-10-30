@@ -198,12 +198,22 @@ function _updateCountdown(callback) {
 	};
 
 	https.get(options, function(res) {
-		res.on('data', function(json) {
-			var data = JSON.parse(json);
-			var changed = countdown != data.count;
-			countdown = data.count;
-			if (changed) {
-				_.each(subscribers, _sendCountdown);
+		var json = '';
+		res.on('data', function(chunk) {
+			json += chunk;
+		});
+		res.on('end', function() {
+			var changed = false;
+			try {
+				var data = JSON.parse(json);
+				changed = countdown != data.count;
+				countdown = data.count;
+				if (changed) {
+					_.each(subscribers, _sendCountdown);
+				}
+			} catch (error) {
+				console.error(error);
+				console.error('json was:', json);
 			}
 			callback(changed);
 		});
