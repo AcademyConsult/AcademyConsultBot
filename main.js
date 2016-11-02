@@ -250,6 +250,18 @@ function subscribe(message) {
 	}
 }
 
+function addLeading0s(string) {
+	return string.replace(/(^|\D)(?=\d(?!\d))/g, '$10');
+}
+
+function getShortDateString(date) {
+	return addLeading0s([date.getDate(), (date.getMonth()+1), ''].join('.'));
+}
+
+function getShortTimeString(date) {
+	return addLeading0s([date.getHours(), date.getMinutes()].join(':'));
+}
+
 function showEvents(message) {
 	bot.sendChatAction({
 		chat_id: message.chat.id,
@@ -265,16 +277,14 @@ function showEvents(message) {
 				.sortBy('start')
 				.value().splice(0, 5),
 			function(event) {
-				var startTime = event.start.toLocaleTimeString('de').replace(/:00$/, '');
-				if (startTime == '00:00') {
-					startTime = '';
-				} else {
-					startTime = ' ' + startTime + ' Uhr';
+				var dateString = getShortDateString(event.start);
+				var timeString = '';
+				if (event.end - event.start > 86400000) { // more than 24h
+					dateString += ' - ' + getShortDateString(event.end);
+				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
+					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
 				}
-				events.push('*' + event.summary + '* ('
-					+ event.start.toLocaleDateString('de').replace(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/, '$3.$2.$1')
-					+ startTime
-				+ ')')
+				events.push(dateString + ': *' + event.summary + '*' + timeString);
 			}
 		);
 		bot.sendMessage({
