@@ -335,7 +335,13 @@ function showReservations(message) {
 			var reservation = reservations.shift();
 			if (reservation) {
 				if (reservation.start <= now) {
-					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + reservation.summary;
+					var next;
+					var users = [reservation.summary.trim()];
+					while ((next = reservations.shift()) && next.start - reservation.end < 900000) { // less than 15min until next reservation
+						users.push(next.summary.trim());
+						reservation = next;
+					}
+					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + users.join(', ');
 				} else {
 					if (reservation.start - now < 72000000) { // in the next 20h
 						lines[room] = 'frei bis ' + getShortTimeString(reservation.start) + ' Uhr';
