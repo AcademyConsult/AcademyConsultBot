@@ -45,6 +45,10 @@ var commands = [
 	{
 		pattern: /\/events/,
 		handler: showEvents
+	},
+	{
+		pattern: /\/buero/,
+		handler: showReservations
 	}
 ];
 
@@ -291,6 +295,59 @@ function showEvents(message) {
 			chat_id: message.chat.id,
 			parse_mode: 'Markdown',
 			text: "[Aktuelle AC-Events](" + config.events.html + "):\n" + events.join("\n")
+		});
+	});
+}
+
+function showReservations(message) {
+	bot.sendChatAction({
+		chat_id: message.chat.id,
+		action: 'typing'
+	});
+
+	var now = new Date();
+	var lines = {};
+
+	var sendResponse = _.after(_.keys(config.rooms).length, function() {
+		var rooms = [];
+		_.each(config.rooms, function(urls, room) {
+			rooms.push('[' + room + '](' + urls.html + ')' + ': ' + lines[room]);
+		});
+		bot.sendMessage({
+			chat_id: message.chat.id,
+			parse_mode: 'Markdown',
+			text: rooms.join("\n")
+		});
+	});
+
+	_.each(config.rooms, function(urls, room) {
+		ical.fromURL(urls.ical, {}, function(err, data) {
+			if (err) {
+				console.error(err);
+				lines[room] = 'Fehler beim Laden';
+				return;
+			}
+
+			var reservations = _.chain(data).filter(function(reservation) {
+				return reservation.end > now;
+			}).sortBy('start').value();
+
+			var reservation = reservations.shift();
+			if (reservation) {
+				if (reservation.start <= now) {
+					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + reservation.summary;
+				} else {
+					if (reservation.start - now < 72000000) { // in the next 20h
+						lines[room] = 'frei bis ' + getShortTimeString(reservation.start) + ' Uhr';
+					} else {
+						lines[room] = 'frei bis ' + getShortDateString(reservation.start) + ', ' + getShortTimeString(reservation.start) + ' Uhr';
+					}
+				}
+			} else {
+				lines[room] = 'frei';
+			}
+
+			sendResponse();
 		});
 	});
 }
