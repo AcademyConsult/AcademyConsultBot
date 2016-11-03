@@ -266,6 +266,22 @@ function getShortTimeString(date) {
 	return addLeading0s([date.getHours(), date.getMinutes()].join(':'));
 }
 
+function _unfoldRecurrentEvents(events, after, before) {
+	events = _.toArray(events);
+	_.each(events, function(event) {
+		if (event.rrule) {
+			_.each(event.rrule.between(after, before), function(newstart) {
+				events.push({
+					summary: event.summary,
+					start: newstart,
+					end: new Date(event.end.getTime() + (newstart - event.start))
+				});
+			});
+		}
+	});
+	return events;
+}
+
 function showEvents(message) {
 	bot.sendChatAction({
 		chat_id: message.chat.id,
@@ -274,6 +290,9 @@ function showEvents(message) {
 	ical.fromURL(config.events.ical, {}, function(err, data) {
 		var events = [];
 		var now = new Date();
+
+		data = _unfoldRecurrentEvents(data, new Date(now - 86400000), new Date(now.getTime() + 30*86400000));
+
 		_.each(_.chain(data)
 				.filter(function(event) {
 					return event.end > now
@@ -327,6 +346,8 @@ function showReservations(message) {
 				lines[room] = 'Fehler beim Laden';
 				return;
 			}
+
+			data = _unfoldRecurrentEvents(data, new Date(now - 86400000), new Date(now.getTime() + 86400000));
 
 			var reservations = _.chain(data).filter(function(reservation) {
 				return reservation.end > now;
