@@ -271,11 +271,13 @@ function _unfoldRecurrentEvents(events, after, before) {
 	_.each(events, function(event) {
 		if (event.rrule) {
 			_.each(event.rrule.between(after, before), function(newstart) {
-				events.push({
-					summary: event.summary,
-					start: newstart,
-					end: new Date(event.end.getTime() + (newstart - event.start))
-				});
+				if (newstart.getTime() != event.start.getTime()) {
+					events.push({
+						summary: event.summary,
+						start: newstart,
+						end: new Date(event.end.getTime() + (newstart - event.start))
+					});
+				}
 			});
 		}
 	});
