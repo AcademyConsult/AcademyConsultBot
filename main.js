@@ -52,14 +52,31 @@ var commands = [
 	}
 ];
 
+var inline_callbacks = [
+	{
+		pattern: /\/room/,
+		handler: showRoomDetails
+	}
+];
+
 var subscribers = [];
 var countdown = 0;
 
 bot.on('message', function(message) {
-	if (message.text) {
+	if (message && message.text) {
 		_.each(commands, function(command) {
 			if (message.text.match(command.pattern)) {
 				command.handler(message);
+			}
+		});
+	}
+});
+
+bot.on('inline.callback.query', function(query) {
+	if (query && query.data) {
+		_.each(inline_callbacks, function(command) {
+			if (query.data.match(command.pattern)) {
+				command.handler(query);
 			}
 		});
 	}
@@ -331,13 +348,16 @@ function showReservations(message) {
 
 	var sendResponse = _.after(_.keys(config.rooms).length, function() {
 		var rooms = [];
+		var markup = {inline_keyboard: []};
 		_.each(config.rooms, function(urls, room) {
 			rooms.push('[' + room + '](' + urls.html + ')' + ': ' + lines[room]);
+			markup.inline_keyboard.push([{text: room, callback_data: '/room ' + room}]);
 		});
 		bot.sendMessage({
 			chat_id: message.chat.id,
 			parse_mode: 'Markdown',
-			text: rooms.join("\n")
+			text: rooms.join("\n"),
+			reply_markup: JSON.stringify(markup)
 		});
 	});
 
@@ -377,6 +397,95 @@ function showReservations(message) {
 			}
 
 			sendResponse();
+		});
+	});
+}
+
+function showRoomDetails(query) {
+	var parts = query.data.match(/\/room (\w+)(?: after:([0-9]+))?(?: before:([0-9]+))?/);
+	var room = parts[1];
+	var after = Number.parseInt(parts[2]);
+	var before = Number.parseInt(parts[3]);
+	if (!config.rooms[room]) {
+		console.error('unknown room requested');
+		console.debug(query);
+		return;
+	}
+
+	bot.sendChatAction({
+		chat_id: query.message.chat.id,
+		action: 'typing'
+	});
+
+	if (!after && !before) {
+		after = Date.now();
+	}
+
+	ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
+		if (err) {
+			console.error(err);
+			bot.answerCallbackQuery({
+				callback_query_id: query.id,
+				text: 'Fehler beim Laden'
+			});
+			return;
+		}
+
+		data = _unfoldRecurrentEvents(data, new Date(after), new Date(before));
+
+		var reservations = _.chain(data).filter(function(reservation) {
+			return (after && reservation.start > after) || (before && reservation.start < before);
+		}).sortBy('start').value();
+
+		if (reservations.length) {
+			if (before) {
+				reservations = reservations.splice(-5);
+			} else {
+				reservations = reservations.splice(0, 5);
+			}
+
+			var lines = [];
+			_.each(reservations, function(reservation) {
+				lines.push(
+					getShortDateString(reservation.start) + ', ' + getShortTimeString(reservation.start) + ' Uhr - '
+					+ getShortDateString(reservation.end) + ', ' + getShortTimeString(reservation.end) + ' Uhr: '
+					+ reservation.summary
+				);
+			});
+
+			bot.editMessageText({
+				chat_id: query.message.chat.id,
+				message_id: query.message.message_id,
+				reply_markup: JSON.stringify({
+					inline_keyboard: [[
+						{text: '<< früher', callback_data: '/room ' + room + ' before:' + _.min(reservations, function(reservation) {return reservation.start}).start.getTime()},
+						{text: 'jetzt', callback_data: '/room ' + room},
+						{text: 'später >>', callback_data: '/room ' + room + ' after:' + _.max(reservations, function(reservation) {return reservation.start}).start.getTime()}
+					]]
+				}),
+				parse_mode: 'Markdown',
+				text: 'Reservierungen im [' + room + '](' + config.rooms[room].html + "):\n" + lines.join("\n")
+			}).catch(_.noop);
+		} else {
+			var buttons = [{text: 'jetzt', callback_data: '/room ' + room}];
+			if (before) {
+				buttons.push({text: 'später >>', callback_data: '/room ' + room + ' after:' + (before - 1)});
+			} else {
+				buttons.unshift({text: '<< früher', callback_data: '/room ' + room + ' before:' + (after + 1)});
+			}
+
+			bot.editMessageText({
+				chat_id: query.message.chat.id,
+				message_id: query.message.message_id,
+				reply_markup: JSON.stringify({
+					inline_keyboard: [buttons]
+				}),
+				parse_mode: 'Markdown',
+				text: '[' + room + '](' + config.rooms[room].html + ")\n" + 'keine Reservierungen für diesen Zeitraum vorhanden'
+			});
+		}
+		bot.answerCallbackQuery({
+			callback_query_id: query.id
 		});
 	});
 }
