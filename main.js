@@ -364,7 +364,7 @@ function showReservations(message) {
 						users.push(next.summary.trim());
 						reservation = next;
 					}
-					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + users.join(', ');
+					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + _.uniq(users).join(', ');
 				} else {
 					if (reservation.start - now < 72000000) { // in the next 20h
 						lines[room] = 'frei bis ' + getShortTimeString(reservation.start) + ' Uhr';
