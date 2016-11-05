@@ -87,7 +87,7 @@ function showStatus(message) {
 		bot.sendChatAction({
 			chat_id: message.chat.id,
 			action: 'typing'
-		});
+		}).catch(_.noop);
 		controller.ApiCall('api/s/default/stat/device', function(data) {
 			var stats = {
 				users: 0,
@@ -110,7 +110,7 @@ function showStatus(message) {
 					chat_id: message.chat.id,
 					reply_to_message_id: message.message_id,
 					text: 'Geräte online: ' + (stats.users + stats.guests)
-				});
+				}).catch(_.noop);
 			} else {
 				bot.sendMessage({
 					chat_id: message.chat.id,
@@ -118,14 +118,14 @@ function showStatus(message) {
 					text: 'UniFi-Controller "' + config.controllers[i].name + '":\n' +
 						'APs: ' + stats.aps + '/' + stats.inactive + '\n' +
 						'users/guests: ' + stats.users + '/' + stats.guests
-				});
+				}).catch(_.noop);
 			}
 		}, function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
 				text: 'Error talking to controller "' + config.controllers[i].name + '": ' + msg
-			});
+			}).catch(_.noop);
 		});
 	});
 }
@@ -135,7 +135,7 @@ function showDetails(message) {
 		bot.sendChatAction({
 			chat_id: message.chat.id,
 			action: 'typing'
-		});
+		}).catch(_.noop);
 		controller.ApiCall('api/s/default/stat/sta', function(data) {
 			var stats = {
 				users: 0,
@@ -160,13 +160,13 @@ function showDetails(message) {
 				reply_to_message_id: message.message_id,
 				text: 'Geräte online: ' + (stats.users + stats.guests) + "\n" +
 					'Namen: ' + stats.names.join(', ')
-			});
+			}).catch(_.noop);
 		}, function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
 				text: 'Error talking to controller "' + config.controllers[i].name + '": ' + msg
-			});
+			}).catch(_.noop);
 		});
 	});
 }
@@ -186,11 +186,11 @@ _.each(controllers, function(controller, i) {
 						bot.sendSticker({
 							chat_id: subscriber,
 							sticker: "BQADAgADJwwAAkKvaQABUq7QF_-jeCkC" // bee doo bee doo
-						});
+						}).catch(_.noop);
 						bot.sendMessage({
 							chat_id: subscriber,
 							text: text
-						});
+						}).catch(_.noop);
 					});
 					return true;
 				}
@@ -204,7 +204,7 @@ function _sendCountdown(chat_id) {
 	bot.sendMessage({
 		chat_id: chat_id,
 		text: 'Aktuelle Anzahl Bewerbungen: ' + countdown
-	});
+	}).catch(_.noop);
 }
 
 setInterval(_updateCountdown, 30000);
@@ -245,7 +245,7 @@ function showApplicants(message) {
 	bot.sendChatAction({
 		chat_id: message.chat.id,
 		action: 'typing'
-	});
+	}).catch(_.noop);
 	var chat_id = message.chat.id;
 	_updateCountdown(function(changed) {
 		if (!changed || subscribers.indexOf(chat_id) == -1) {
@@ -261,13 +261,13 @@ function subscribe(message) {
 		bot.sendMessage({
 			chat_id: message.chat.id,
 			text: 'Du erhälst jetzt automatische Updates, wenn neue Bewerbungen rein kommen'
-		});
+		}).catch(_.noop);
 	} else {
 		subscribers.splice(index, 1);
 		bot.sendMessage({
 			chat_id: message.chat.id,
 			text: 'Automatische Updates deaktiviert'
-		});
+		}).catch(_.noop);
 	}
 }
 
@@ -305,7 +305,7 @@ function showEvents(message) {
 	bot.sendChatAction({
 		chat_id: message.chat.id,
 		action: 'typing'
-	});
+	}).catch(_.noop);
 	ical.fromURL(config.events.ical, {}, function(err, data) {
 		var events = [];
 		var now = new Date();
@@ -333,7 +333,7 @@ function showEvents(message) {
 			chat_id: message.chat.id,
 			parse_mode: 'Markdown',
 			text: "[Aktuelle AC-Events](" + config.events.html + "):\n" + events.join("\n")
-		});
+		}).catch(_.noop);
 	});
 }
 
@@ -341,7 +341,7 @@ function showReservations(message) {
 	bot.sendChatAction({
 		chat_id: message.chat.id,
 		action: 'typing'
-	});
+	}).catch(_.noop);
 
 	var now = new Date();
 	var lines = {};
@@ -358,7 +358,7 @@ function showReservations(message) {
 			parse_mode: 'Markdown',
 			text: rooms.join("\n"),
 			reply_markup: JSON.stringify(markup)
-		});
+		}).catch(_.noop);
 	});
 
 	_.each(config.rooms, function(urls, room) {
@@ -415,7 +415,7 @@ function showRoomDetails(query) {
 	bot.sendChatAction({
 		chat_id: query.message.chat.id,
 		action: 'typing'
-	});
+	}).catch(_.noop);
 
 	if (!after && !before) {
 		after = Date.now();
@@ -427,7 +427,7 @@ function showRoomDetails(query) {
 			bot.answerCallbackQuery({
 				callback_query_id: query.id,
 				text: 'Fehler beim Laden'
-			});
+			}).catch(_.noop);
 			return;
 		}
 
@@ -482,10 +482,10 @@ function showRoomDetails(query) {
 				}),
 				parse_mode: 'Markdown',
 				text: '[' + room + '](' + config.rooms[room].html + ")\n" + 'keine Reservierungen für diesen Zeitraum vorhanden'
-			});
+			}).catch(_.noop);
 		}
 		bot.answerCallbackQuery({
 			callback_query_id: query.id
-		});
+		}).catch(_.noop);
 	});
 }
