@@ -275,12 +275,19 @@ function addLeading0s(string) {
 	return string.replace(/(^|\D)(?=\d(?!\d))/g, '$10');
 }
 
-function getShortDateString(date) {
+function getShortDateString(date, is_end) {
+	if (is_end) {
+		date = new Date(date - 1);
+	}
 	return addLeading0s([date.getDate(), (date.getMonth()+1), ''].join('.'));
 }
 
-function getShortTimeString(date) {
-	return addLeading0s([date.getHours(), date.getMinutes()].join(':'));
+function getShortTimeString(date, is_end) {
+	var time = addLeading0s([date.getHours(), date.getMinutes()].join(':'));
+	if (is_end && time == '00:00') {
+		time = '24:00';
+	}
+	return time;
 }
 
 function _unfoldRecurrentEvents(events, after, before) {
@@ -322,7 +329,7 @@ function showEvents(message) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
 				if (event.end - event.start > 86400000) { // more than 24h
-					dateString += ' - ' + getShortDateString(event.end);
+					dateString += ' - ' + getShortDateString(event.end, true);
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
 					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
 				}
@@ -384,13 +391,13 @@ function showReservations(message) {
 						users.push(next.summary.trim());
 						reservation = next;
 					}
-					lines[room] = 'belegt bis ' + getShortTimeString(reservation.end) + ' Uhr von ' + _.uniq(users).join(', ');
+					lines[room] = 'belegt bis '
+						+ (reservation.end - now > 86400000 ? getShortDateString(reservation.end, true) + ', ' : '')
+						+ getShortTimeString(reservation.end, true) + ' Uhr von ' + _.uniq(users).join(', ');
 				} else {
-					if (reservation.start - now < 72000000) { // in the next 20h
-						lines[room] = 'frei bis ' + getShortTimeString(reservation.start) + ' Uhr';
-					} else {
-						lines[room] = 'frei bis ' + getShortDateString(reservation.start) + ', ' + getShortTimeString(reservation.start) + ' Uhr';
-					}
+					lines[room] = 'frei bis '
+						+ (reservation.start - now > 86400000 ? getShortDateString(reservation.start) + ', ' : '')
+						+ getShortTimeString(reservation.start) + ' Uhr';
 				}
 			} else {
 				lines[room] = 'frei';
@@ -448,7 +455,7 @@ function showRoomDetails(query) {
 			_.each(reservations, function(reservation) {
 				lines.push(
 					getShortDateString(reservation.start) + ', ' + getShortTimeString(reservation.start) + ' Uhr - '
-					+ getShortDateString(reservation.end) + ', ' + getShortTimeString(reservation.end) + ' Uhr: '
+					+ getShortDateString(reservation.end, true) + ', ' + getShortTimeString(reservation.end, true) + ' Uhr: '
 					+ reservation.summary
 				);
 			});
