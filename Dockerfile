@@ -6,4 +6,4 @@ WORKDIR /app/
 COPY main.js unifi.js package.json /app/
 RUN npm install
 
-CMD npm start
+CMD ["npm", "start"]
