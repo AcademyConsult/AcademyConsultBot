@@ -453,11 +453,25 @@ function showRoomDetails(query) {
 
 			var lines = [];
 			_.each(reservations, function(reservation) {
-				lines.push(
-					getShortDateString(reservation.start) + ', ' + getShortTimeString(reservation.start) + ' Uhr - '
-					+ getShortDateString(reservation.end, true) + ', ' + getShortTimeString(reservation.end, true) + ' Uhr: '
-					+ reservation.summary
-				);
+				var start_time = getShortTimeString(reservation.start);
+				var start_date = getShortDateString(reservation.start);
+				var end_time = getShortTimeString(reservation.end, true);
+				var end_date = getShortDateString(reservation.end, true);
+				var time = '';
+				if (reservation.end - reservation.start > 86400000) {
+					if (start_time == '00:00' && end_time == '24:00') {
+						time = start_date + ' - ' + end_date;
+					} else {
+						time = start_date + ', ' + start_time + ' Uhr - ' + end_date + ', ' + end_time + ' Uhr';
+					}
+				} else {
+					if (start_time == '00:00' && end_time == '24:00') {
+						time = start_date;
+					} else {
+						time = start_date + ', ' + start_time + ' - ' + end_time + ' Uhr';
+					}
+				}
+				lines.push(time + ': ' + reservation.summary);
 			});
 
 			bot.editMessageText({
