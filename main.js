@@ -47,6 +47,9 @@ var inline_callbacks = [
 	{
 		pattern: /\/room/,
 		handler: showRoomDetails
+	}, {
+		pattern: /\/events/,
+		handler: showEvents
 	}
 ];
 
@@ -225,24 +228,46 @@ function _unfoldRecurrentEvents(events, after, before) {
 	return events;
 }
 
-function showEvents(message) {
+function showEvents(query) {
+	var after, before;
+	if (query.data) {
+		var parts = query.data.match(/\/events(?: after:([0-9]+))?(?: before:([0-9]+))?/);
+		after = Number.parseInt(parts[1]);
+		before = Number.parseInt(parts[2]);
+		message = query.message;
+	} else {
+		message = query;
+		query = false;
+	}
+
 	bot.sendChatAction({
 		chat_id: message.chat.id,
 		action: 'typing'
 	}).catch(_.noop);
+
+	if (!after && !before) {
+		after = Date.now();
+	}
+
 	ical.fromURL(config.events.ical, {}, function(err, data) {
-		var events = [];
-		var now = new Date();
+		data = _unfoldRecurrentEvents(data, new Date(after), new Date(before));
 
-		data = _unfoldRecurrentEvents(data, new Date(now - 86400000), new Date(now.getTime() + 30*86400000));
+		var events = _.chain(data).filter(function(event) {
+			return (after && event.end > after) || (before && event.start < before);
+		}).sortBy('start').value();
 
-		_.each(_.chain(data)
-				.filter(function(event) {
-					return event.end > now
-				})
-				.sortBy('start')
-				.value().splice(0, 5),
-			function(event) {
+		var text = '[Aktuelle AC-Events](' + config.events.html + "):\n";
+		var markup;
+
+		if (events.length) {
+			if (before) {
+				events = events.splice(-5);
+			} else {
+				events = events.splice(0, 5);
+			}
+
+			var lines = [];
+			_.each(events, function(event) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
 				if (event.end - event.start > 86400000) { // more than 24h
@@ -250,14 +275,50 @@ function showEvents(message) {
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
 					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
 				}
-				events.push(dateString + ': *' + event.summary + '*' + timeString);
+				lines.push(dateString + ': *' + event.summary + '*' + timeString);
+			});
+
+			markup = JSON.stringify({
+				inline_keyboard: [[
+					{text: '<< früher', callback_data: '/events before:' + _.min(events, function(event) {return event.start}).start.getTime()},
+					{text: 'jetzt', callback_data: '/events'},
+					{text: 'später >>', callback_data: '/events after:' + _.max(events, function(event) {return event.start}).start.getTime()}
+				]]
+			});
+			text += lines.join("\n");
+		} else {
+			var buttons = [{text: 'jetzt', callback_data: '/events'}];
+			if (before) {
+				buttons.push({text: 'später >>', callback_data: '/events after:' + (before - 1)});
+			} else {
+				buttons.unshift({text: '<< früher', callback_data: '/events before:' + (after + 1)});
 			}
-		);
-		bot.sendMessage({
-			chat_id: message.chat.id,
-			parse_mode: 'Markdown',
-			text: "[Aktuelle AC-Events](" + config.events.html + "):\n" + events.join("\n")
-		}).catch(_.noop);
+
+			markup = JSON.stringify({
+				inline_keyboard: [buttons]
+			});
+			text += 'Keine Events in diesem Zeitraum vorhanden';
+		}
+
+		if (query) {
+			bot.editMessageText({
+				chat_id: query.message.chat.id,
+				message_id: query.message.message_id,
+				reply_markup: markup,
+				parse_mode: 'Markdown',
+				text: text
+			}).catch(_.noop);
+			bot.answerCallbackQuery({
+				callback_query_id: query.id
+			}).catch(_.noop);
+		} else {
+			bot.sendMessage({
+				chat_id: message.chat.id,
+				parse_mode: 'Markdown',
+				text: text,
+				reply_markup: markup
+			}).catch(_.noop);
+		}
 	});
 }
 
