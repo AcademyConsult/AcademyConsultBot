@@ -2,8 +2,10 @@ var telegram = require('telegram-bot-api');
 var unifi    = require('./unifi.js');
 var ical     = require('ical');
 var _        = require('underscore')._;
+var Cache    = require('./cache');
 
 var config = require('./config.json');
+var cache  = new Cache();
 
 var bot = new telegram({
 	token: config.token,
@@ -210,13 +212,26 @@ function getShortTimeString(date, is_end) {
 	return time;
 }
 
-function _unfoldRecurrentEvents(events, after, before) {
-	events = _.toArray(events);
+function filterEvents(events, count, after, before) {
+	after = new Date(after);
+	before = new Date(before);
+
+	var results = _.filter(events, function(event) {
+		return event.end > after || event.start < before;
+	});
+
+	var ascending = !before.getTime();
+	if (count && results.length >= count) {
+		results = _.sortBy(results, 'start').splice(ascending ? 0 : -count, count);
+		after  =  ascending ? after  : _.min(results, function(event) {return event.start}).start;
+		before = !ascending ? before : _.max(results, function(event) {return event.end  }).end;
+	}
+
 	_.each(events, function(event) {
 		if (event.rrule) {
 			_.each(event.rrule.between(after, before), function(newstart) {
 				if (newstart.getTime() != event.start.getTime()) {
-					events.push({
+					results.push({
 						summary: event.summary,
 						start: newstart,
 						end: new Date(event.end.getTime() + (newstart - event.start))
@@ -225,7 +240,9 @@ function _unfoldRecurrentEvents(events, after, before) {
 			});
 		}
 	});
-	return events;
+
+	results = _.sortBy(results, 'start');
+	return count ? results.splice(ascending ? 0 : -count, count) : results;
 }
 
 function showEvents(query) {
@@ -249,12 +266,16 @@ function showEvents(query) {
 		after = Date.now();
 	}
 
-	ical.fromURL(config.events.ical, {}, function(err, data) {
-		data = _unfoldRecurrentEvents(data, new Date(after), new Date(before));
-
-		var events = _.chain(data).filter(function(event) {
-			return (after && event.end > after) || (before && event.start < before);
-		}).sortBy('start').value();
+	cache.get('calendars.events', function(callback) {
+		ical.fromURL(config.events.ical, {}, function(err, data) {
+			if (err) {
+				console.error(err);
+			} else {
+				callback(data, 120000);
+			}
+		});
+	}, function(data) {
+		var events = filterEvents(data, 5, after, before);
 
 		var text = '[Aktuelle AC-Events](' + config.events.html + "):\n";
 		var markup;
@@ -347,18 +368,19 @@ function showReservations(message) {
 	});
 
 	_.each(config.rooms, function(urls, room) {
-		ical.fromURL(urls.ical, {}, function(err, data) {
-			if (err) {
-				console.error(err);
-				lines[room] = 'Fehler beim Laden';
-				return;
-			}
-
-			data = _unfoldRecurrentEvents(data, new Date(now - 86400000), new Date(now.getTime() + 86400000));
-
-			var reservations = _.chain(data).filter(function(reservation) {
-				return reservation.end > now;
-			}).sortBy('start').value();
+		cache.get('calendars.' + room, function(callback) {
+			ical.fromURL(urls.ical, {}, function(err, data) {
+				if (err) {
+					console.error(err);
+					lines[room] = 'Fehler beim Laden';
+					sendResponse();
+					return;
+				} else {
+					callback(data, 120000);
+				}
+			});
+		}, function(data) {
+			var reservations = filterEvents(data, 0, now);
 
 			var reservation = reservations.shift();
 			if (reservation) {
@@ -406,21 +428,21 @@ function showRoomDetails(query) {
 		after = Date.now();
 	}
 
-	ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
-		if (err) {
-			console.error(err);
-			bot.answerCallbackQuery({
-				callback_query_id: query.id,
-				text: 'Fehler beim Laden'
-			}).catch(_.noop);
-			return;
-		}
-
-		data = _unfoldRecurrentEvents(data, new Date(after), new Date(before));
-
-		var reservations = _.chain(data).filter(function(reservation) {
-			return (after && reservation.start > after) || (before && reservation.start < before);
-		}).sortBy('start').value();
+	cache.get('calendars.' + room, function(callback) {
+		ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
+			if (err) {
+				console.error(err);
+				bot.answerCallbackQuery({
+					callback_query_id: query.id,
+					text: 'Fehler beim Laden'
+				}).catch(_.noop);
+				return;
+			} else {
+				callback(data, 120000);
+			}
+		});
+	}, function(data) {
+		var reservations = filterEvents(data, 5, after, before);
 
 		if (reservations.length) {
 			if (before) {
