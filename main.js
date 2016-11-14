@@ -3,7 +3,10 @@ var unifi    = require('./unifi.js');
 var ical     = require('ical');
 var _        = require('underscore')._;
 var Cache    = require('./cache');
+var ldap     = require('ldapjs');
+var fs       = require('fs');
 
+var ca     = fs.readFileSync('activedirectory_CA.pem');
 var config = require('./config.json');
 var cache  = new Cache();
 
@@ -28,30 +31,34 @@ for (i = 0; i < config.controllers.length; i++) {
 
 var commands = [
 	{
+		pattern: /\/start/,
+		handler: wrapRestrictedCommand(runStart)
+	},
+	{
 		pattern: /\/status/,
-		handler: showStatus
+		handler: wrapRestrictedCommand(showStatus)
 	},
 	{
 		pattern: /\/details/,
-		handler: showDetails
+		handler: wrapRestrictedCommand(showDetails)
 	},
 	{
 		pattern: /\/events/,
-		handler: showEvents
+		handler: wrapRestrictedCommand(showEvents)
 	},
 	{
 		pattern: /\/buero/,
-		handler: showReservations
+		handler: wrapRestrictedCommand(showReservations)
 	}
 ];
 
 var inline_callbacks = [
 	{
 		pattern: /\/room/,
-		handler: showRoomDetails
+		handler: wrapRestrictedCommand(showRoomDetails)
 	}, {
 		pattern: /\/events/,
-		handler: showEvents
+		handler: wrapRestrictedCommand(showEvents)
 	}
 ];
 
@@ -74,6 +81,100 @@ bot.on('inline.callback.query', function(query) {
 		});
 	}
 });
+
+function wrapRestrictedCommand(command) {
+	return function(query) {
+		getADUser(query.from.id, function(user) {
+			if (user) {
+				command(query, user);
+			} else {
+				var message = query.message || query;
+				bot.sendMessage({
+					chat_id: message.chat.id,
+					parse_mode: 'Markdown',
+					text: "Dieser Bot ist nur für Mitglieder von Academy Consult München e.V. verfügbar.\n"
+						+ "Bitte [logge dich hier ein](https://www.acintern.de/telegram/?id=" + query.from.id + "), um dich freizuschalten.",
+				}).catch(_.noop);
+			}
+		}, function() {
+			if (query.data) {
+				bot.answerCallbackQuery({
+					callback_query_id: query.id,
+					text: 'Fehler beim Laden der Benutzerdaten'
+				}).catch(_.noop);
+			} else {
+				bot.sendMessage({
+					chat_id: query.chat.id,
+					text: 'Fehler beim Laden der Benutzerdaten',
+				}).catch(_.noop);
+			}
+		});
+	}
+}
+
+function getADUser(uid, success, onerror) {
+	onerror = onerror || function() {};
+	cache.get('aduser.' + uid, function(callback) {
+		var client = ldap.createClient({
+			url: config.ldap.uri,
+			tlsOptions: {
+				ca: ca
+			}
+		});
+		client.bind(config.ldap.binddn, config.ldap.bindpw, function(err, res) {
+			if (err) {
+				console.error(err);
+				onerror();
+				return;
+			}
+
+			var opts = {
+				filter: '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(' + config.ldap.uid_attribute + '=' + uid + '))',
+				scope: 'sub',
+				attributes: ['givenName', 'displayName', config.ldap.uid_attribute]
+			};
+
+			client.search(config.ldap.basedn, opts, function(err, res) {
+				if (err) {
+					console.error(err);
+					client.destroy();
+					onerror();
+					return;
+				}
+
+				var data;
+				res.on('searchEntry', function(entry) {
+					data = entry.object;
+				});
+				res.on('error', function(err) {
+					console.error(err);
+					client.destroy();
+					onerror();
+				});
+				res.on('end', function(result) {
+					client.destroy();
+					if (result.status != 0) {
+						console.error(result);
+						onerror();
+					} else {
+						if (data) {
+							callback(data, 86400000);
+						} else {
+							callback(data, 1000);
+						}
+					}
+				});
+			});
+		});
+	}, success);
+}
+
+function runStart(message, user) {
+	bot.sendMessage({
+		chat_id: message.chat.id,
+		text: 'Hallo ' + user.givenName + '! Was kann ich für dich tun?'
+	}).catch(_.noop);
+}
 
 function showStatus(message) {
 	_.each(controllers, function(controller, i) {
