@@ -49,6 +49,10 @@ var commands = [
 	{
 		pattern: /\/buero/,
 		handler: wrapRestrictedCommand(showReservations)
+	},
+	{
+		pattern: /\/kontakte/,
+		handler: wrapRestrictedCommand(showContactsHelp)
 	}
 ];
 
@@ -81,6 +85,8 @@ bot.on('inline.callback.query', function(query) {
 		});
 	}
 });
+
+bot.on('inline.query', searchContacts);
 
 function wrapRestrictedCommand(command) {
 	return function(query) {
@@ -614,5 +620,111 @@ function showRoomDetails(query) {
 		bot.answerCallbackQuery({
 			callback_query_id: query.id
 		}).catch(_.noop);
+	});
+}
+
+var contacts = [];
+function fetchContacts() {
+	var client = ldap.createClient({
+		url: config.ldap.uri,
+		tlsOptions: {
+			ca: ca
+		}
+	});
+	client.bind(config.ldap.binddn, config.ldap.bindpw, function(err, res) {
+		if (err) {
+			console.error(err);
+			setTimeout(fetchContacts, 60000);
+			return;
+		}
+
+		var opts = {
+			filter: '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(mobile=*))',
+			scope: 'sub',
+			attributes: ['givenName', 'sn', 'displayName', 'name', 'mobile']
+		};
+
+		client.search(config.ldap.basedn, opts, function(err, res) {
+			if (err) {
+				console.error(err);
+				client.destroy();
+				setTimeout(fetchContacts, 60000);
+				return;
+			}
+
+			var data = [];
+			res.on('searchEntry', function(entry) {
+				data.push(entry.object);
+			});
+			res.on('error', function(err) {
+				console.error(err);
+				client.destroy();
+			});
+			res.on('end', function(result) {
+				contacts = _.sortBy(data, 'displayName');
+				setTimeout(fetchContacts, 43200000);
+			});
+		});
+	});
+}
+fetchContacts();
+
+function showContactsHelp(message, user) {
+	bot.sendMessage({
+		chat_id: message.chat.id,
+		text: "Du kannst in jedem Chat nach Telefonnummern von AClern suchen und sie direkt mit deinem Gegenüber teilen.\n"
+			+ "Dazu musst du nur in deine Eingabezeile \"@AcademyConsultBot\" gefolgt von einem Namen eingeben. "
+			+ "Es werden dabei nur Kontakte angezeigt, für die eine Handynummer im SharePoint hinterlegt wurde!\n"
+			+ "Für ein Beispiel drücke einen der Buttons:",
+		reply_markup: JSON.stringify({
+			inline_keyboard: [
+				[{text: 'direkt hier', switch_inline_query_current_chat: user.givenName}],
+				[{text: 'anderer Chat', switch_inline_query: user.givenName}]
+			]
+		})
+	}).catch(_.noop);
+}
+
+function searchContacts(query) {
+	var max_results = 15;
+	var next_result;
+	getADUser(query.from.id, function(user) {
+		if (!user) {
+			bot.answerInlineQuery({
+				inline_query_id: query.id,
+				results: [],
+				is_personal: 'true',
+				cache_time: 0,
+				switch_pm_text: 'Bitte erst einloggen',
+				switch_pm_parameter: 'contacts'
+			});
+		} else {
+			var results = _.filter(contacts, function(contact) {
+				return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
+			});
+			if (query.offset) {
+				results = results.splice(query.offset);
+			}
+			if (results.length > max_results) {
+				next_result = max_results + Number.parseInt(query.offset ? query.offset : 0);
+				results = results.splice(0, max_results);
+			}
+			results = _.map(results, function(contact) {
+				return {
+					type: 'contact',
+					id: contact.name,
+					phone_number: contact.mobile,
+					first_name: contact.givenName,
+					last_name: contact.sn
+				}
+			});
+			bot.answerInlineQuery({
+				inline_query_id: query.id,
+				results: results,
+				is_personal: 'true',
+				cache_time: 0,
+				next_offset: next_result
+			});
+		}
 	});
 }
