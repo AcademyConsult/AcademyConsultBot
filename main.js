@@ -53,6 +53,10 @@ var commands = [
 	{
 		pattern: /\/kontakte/,
 		handler: wrapRestrictedCommand(showContactsHelp)
+	},
+	{
+		pattern: /\/bdsu/,
+		handler: wrapRestrictedCommand(showBDSUEvents)
 	}
 ];
 
@@ -63,6 +67,10 @@ var inline_callbacks = [
 	}, {
 		pattern: /\/events/,
 		handler: wrapRestrictedCommand(showEvents)
+	},
+	{
+		pattern: /\/bdsu/,
+		handler: wrapRestrictedCommand(showBDSUEvents)
 	}
 ];
 
@@ -725,6 +733,115 @@ function searchContacts(query) {
 				cache_time: 0,
 				next_offset: next_result
 			});
+		}
+	});
+}
+
+function showBDSUEvents(query) {
+	var after, before;
+	if (query.data) {
+		var parts = query.data.match(/\/bdsu(?: after:([0-9]+))?(?: before:([0-9]+))?/);
+		after = Number.parseInt(parts[1]);
+		before = Number.parseInt(parts[2]);
+		message = query.message;
+	} else {
+		message = query;
+		query = false;
+	}
+
+	bot.sendChatAction({
+		chat_id: message.chat.id,
+		action: 'typing'
+	}).catch(_.noop);
+
+	if (!after && !before) {
+		after = Date.now();
+	}
+
+	cache.get('calendars.bdsu', function(callback) {
+		var events = {};
+		var error = false;
+		function loadIcals(i) {
+			if (i < config.bdsu.length) {
+				ical.fromURL(config.bdsu[i], {}, function(err, data) {
+					if (err) {
+						error = true;
+						console.error(err);
+					} else {
+						_.extend(events, data);
+					}
+					loadIcals(i+1);
+				});
+			} else {
+				callback(events, error ? 0 : 120000);
+			}
+		}
+		loadIcals(0);
+	}, function(data) {
+		var events = filterEvents(data, 5, after, before);
+
+		var text = "Aktuelle BDSU-Treffen:\n";
+		var markup;
+
+		if (events.length) {
+			if (before) {
+				events = events.splice(-5);
+			} else {
+				events = events.splice(0, 5);
+			}
+
+			var lines = [];
+			_.each(events, function(event) {
+				var dateString = getShortDateString(event.start);
+				var timeString = '';
+				if (event.end - event.start > 86400000) { // more than 24h
+					dateString += ' - ' + getShortDateString(event.end, true);
+				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
+					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
+				}
+				lines.push(dateString + ': [' + event.summary + '](' + event.url + ')' + timeString);
+			});
+
+			markup = JSON.stringify({
+				inline_keyboard: [[
+					{text: '<< früher', callback_data: '/bdsu before:' + _.min(events, function(event) {return event.start}).start.getTime()},
+					{text: 'jetzt', callback_data: '/bdsu'},
+					{text: 'später >>', callback_data: '/bdsu after:' + _.max(events, function(event) {return event.start}).end.getTime()}
+				]]
+			});
+			text += lines.join("\n");
+		} else {
+			var buttons = [{text: 'jetzt', callback_data: '/bdsu'}];
+			if (before) {
+				buttons.push({text: 'später >>', callback_data: '/bdsu after:' + (before - 1)});
+			} else {
+				buttons.unshift({text: '<< früher', callback_data: '/bdsu before:' + (after + 1)});
+			}
+
+			markup = JSON.stringify({
+				inline_keyboard: [buttons]
+			});
+			text += 'Keine Events in diesem Zeitraum vorhanden';
+		}
+
+		if (query) {
+			bot.editMessageText({
+				chat_id: query.message.chat.id,
+				message_id: query.message.message_id,
+				reply_markup: markup,
+				parse_mode: 'Markdown',
+				text: text
+			}).catch(_.noop);
+			bot.answerCallbackQuery({
+				callback_query_id: query.id
+			}).catch(_.noop);
+		} else {
+			bot.sendMessage({
+				chat_id: message.chat.id,
+				parse_mode: 'Markdown',
+				text: text,
+				reply_markup: markup
+			}).catch(_.noop);
 		}
 	});
 }

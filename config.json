@@ -19,6 +19,10 @@
 		"ical": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.ics",
 		"html": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.html"
 	},
+	"bdsu": [
+		"https://cal.to/ical/784/bdsu/arbeitskreistreffen/c1d585d2.f9a3e60d-56cfc646.ics",
+		"https://cal.to/ical/785/bdsu/kongresse/c1d585d2.f9a3e60d-c0cbae3d.ics"
+	],
 	"rooms": {
 		"Kundenzimmer": {
 			"ical": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.ics",
