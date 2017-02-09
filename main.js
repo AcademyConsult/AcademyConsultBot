@@ -776,7 +776,22 @@ function showBDSUEvents(query) {
 				callback(events, error ? 0 : 120000);
 			}
 		}
-		loadIcals(0);
+		cache.get('calendars.events', function(callback) {
+			ical.fromURL(config.events.ical, {}, function(err, data) {
+				if (err) {
+					console.error(err);
+				} else {
+					callback(data, 120000);
+				}
+			});
+		}, function(data) {
+			_(data).each(function(event, id) {
+				if (event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)) {
+					events[id] = event;
+				}
+			});
+			loadIcals(0);
+		})
 	}, function(data) {
 		var events = filterEvents(data, 5, after, before);
 
