@@ -2,8 +2,10 @@
 Dies ist der Quellcode für den [Telegram](https://telegram.org/)-Bot von Academy Consult.
 
 Unterstützte Befehle
+* /bewerbungen: zeigt die Anzahl der aktuellen Bewerbungen während dem Recruiting an
 * /bdsu: zeigt BDSU-Events an, die im Eventkalender oder in den BDSU-Kalendern stehen
 * /buero: zeigt die aktuellen Reservierungen/Verfügbarkeiten der Büroräume an
+* /countdown: aktiviert Push-Benachrichtigungen für neue Bewerbungen während dem Recruiting
 * /details: zeigt an, wie viele Geräte im Büro-WLAN online sind und die Namen der Benutzer, falls verfügbar
 * /events: zeigt die aktuellen Termine aus dem Event-Kalender an
 * inline query: Suchen und Versenden von Kontakten aus dem internen Adressbuch
@@ -13,7 +15,7 @@ Unterstützte Befehle
 Die Funktionen des Bots stehen nur Mitgliedern von Academy Consult München e.V.
 zur Verfügung. Zur Authentifizierung muss die Telegram User-ID bei einem aktiven
 Benutzer im internen Active Directory hinterlegt sein (in einem
-[`extensionAttribute`](config.json#L44)-Attribut).
+[`extensionAttribute`](config.json#L48)-Attribut).
 
 Beim ersten Kontakt sucht der Bot nach einem aktiven AD-Benutzer mit der
 Telegram-ID im entsprechenden Attribut. Wird kein aktiver AD-Benutzer gefunden,

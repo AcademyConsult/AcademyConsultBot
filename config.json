@@ -37,6 +37,10 @@
 			"html": "https://outlook.office365.com/owa/calendar/<calendarID>@academyconsult.de/<hash>/calendar.html"
 		}
 	},
+	"countdown": {
+		"host": "www.example.com",
+		"path": "/path/to/data"
+	},
 	"ldap": {
 		"uri": "ldaps://activedirectory.example.com",
 		"binddn": "user@activedirectory.example.com",
