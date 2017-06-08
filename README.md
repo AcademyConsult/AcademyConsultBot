@@ -49,3 +49,49 @@ Mit Eingaben der inline queries werden alle Namen der aktiven AD-Benutzer
 durchsucht und Treffer als Ergebnisse zur Auswahl angezeigt. Ausgewählte Treffer
 werden als Kontakte inkl. Handynummer (AD-Attribut `mobile`) an den aktuellen
 Chat gesendet.
+
+## Ausführung
+Der Bot kann als Docker-Container gebaut und gestartet werden mit einem einfachen
+```
+docker-compose up -d
+```
+
+### Konfiguration
+Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenommen:
+
+* `token`: String - [API-Token für Telegram](https://core.telegram.org/bots/api#authorizing-your-bot)
+* `timeout`: Int - Timeout für [`getUpdates`](https://core.telegram.org/bots/api#getupdates)
+* `controllers`: Array - von UniFi-Controllern, die abgefragt werden sollen
+  * `name`: String - Anzeigename für diesen UniFi-Controller
+  * `uri`: String - Basis-URL, unter der der Controller erreichbar ist
+  * `username`: String - Benutzername für API-Login
+  * `password`: String - Passwort für API-Login
+  * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.js#310) werden soll
+  * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.js#233) können
+* `events` - Object - `ical` und `html` URLs für den Eventkalender (`/events`)
+* `bdsu`: Array - iCal-URLs für BDSU-Events (`/bdsu`)
+* `rooms`: Object - `ical` und `html` URLs für alle Raumkalender mit Raumnamen als Keys (`/buero`)
+* `countdown`: Object - URL zum API-Endpunkt zum Abfragen der Bewerberzahlen (`/bewerbungen`, `/countdown`)
+* `ldap`: Object - Konfiguration für LDAP-Verbindung
+  * `uri`: String - URI zum LDAP-Server, inkl. Schema
+  * `binddn`: String - DN oder userPrincipalName für Login
+  * `bindpw`: String - Passwort für Login
+  * `uid_attribute`: String - LDAP-Attribut, in dem die Telegram-Benutzer-ID gespeichert ist
+  * `basedn`: String - DN auf den die Suche nach Benutzerobjekten eingeschränkt werden soll
+
+Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
+des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#10)
+benötigt.
+
+### Entwicklung
+Für die lokale Entwicklung kann der Bot auch über
+```
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+gestartet werden. Dadurch wird das komplette Verzeichnis unter `/app` in den
+Container gemountet, sodass alle Dateiänderungen auch ohne neuen `docker build`
+beim nächsten Start sofort effektiv sind und der
+[node inspector](https://nodejs.org/en/docs/inspector/) gestartet, sodass man in
+Chrome über `chrome://inspect` bzw. die ausgebene `chrome-devtools://...` URL
+(IP in der URL austauschen!) den laufenden Bot mit den DevTools öffnen und live
+debuggen kann.
