@@ -22,7 +22,7 @@ function Unifi(base_url, username, password, site) {
 		err     = err     || function() {};
 
 		var options = _.extend({}, defaults, {
-			path: base_path + 'api/login'
+			path: `${base_path}api/login`
 		});
 		_doRequest(options,
 			function(result, data) {
@@ -71,12 +71,12 @@ function Unifi(base_url, username, password, site) {
 	this.ApiCall = ApiCall;
 
 	this.handleAlarms = function(handler) {
-		ApiCall('api/s/' + site + '/list/alarm',
+		ApiCall(`api/s/${site}/list/alarm`,
 			function(alarms) {
 				_.each(alarms, function(alarm) {
 					var handled = handler(alarm);
 					if (handled) {
-						ApiCall('api/s/' + site + '/cmd/evtmgr', null, null, {_id: alarm._id, cmd: "archive-alarm"});
+						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"});
 					}
 				});
 			},

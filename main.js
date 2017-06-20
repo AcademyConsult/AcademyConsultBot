@@ -119,7 +119,7 @@ function wrapRestrictedCommand(command) {
 				if (query.from.id != message.chat.id) {
 					text += "Bitte schreibe mir eine private Nachricht an @AcademyConsultBot, um dich freizuschalten.";
 				} else {
-					text += "Bitte [logge dich hier ein](https://www.acintern.de/telegram?id=" + query.from.id + "), um dich freizuschalten.";
+					text += `Bitte [logge dich hier ein](https://www.acintern.de/telegram?id=${query.from.id}), um dich freizuschalten.`;
 				}
 				bot.sendMessage({
 					chat_id: message.chat.id,
@@ -145,7 +145,7 @@ function wrapRestrictedCommand(command) {
 
 function getADUser(uid, success, onerror) {
 	onerror = onerror || function() {};
-	cache.get('aduser.' + uid, function(callback) {
+	cache.get(`aduser.${uid}`, function(callback) {
 		var client = ldap.createClient({
 			url: config.ldap.uri,
 			tlsOptions: {
@@ -160,7 +160,7 @@ function getADUser(uid, success, onerror) {
 			}
 
 			var opts = {
-				filter: '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(' + config.ldap.uid_attribute + '=' + uid + '))',
+				filter: `(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(${config.ldap.uid_attribute}=${uid}))`,
 				scope: 'sub',
 				attributes: ['givenName', 'displayName', config.ldap.uid_attribute]
 			};
@@ -203,7 +203,7 @@ function getADUser(uid, success, onerror) {
 function runStart(message, user) {
 	bot.sendMessage({
 		chat_id: message.chat.id,
-		text: 'Hallo ' + user.givenName + '! Was kann ich für dich tun?'
+		text: `Hallo ${user.givenName}! Was kann ich für dich tun?`
 	}).catch(_.noop);
 }
 
@@ -234,22 +234,22 @@ function showStatus(message) {
 				bot.sendMessage({
 					chat_id: message.chat.id,
 					reply_to_message_id: message.message_id,
-					text: 'Geräte online: ' + (stats.users + stats.guests)
+					text: `Geräte online: ${stats.users + stats.guests}`
 				}).catch(_.noop);
 			} else {
 				bot.sendMessage({
 					chat_id: message.chat.id,
 					reply_to_message_id: message.message_id,
-					text: 'UniFi-Controller "' + config.controllers[i].name + '":\n' +
-						'APs: ' + stats.aps + '/' + stats.inactive + '\n' +
-						'users/guests: ' + stats.users + '/' + stats.guests
+					text: `UniFi-Controller "${config.controllers[i].name}":\n` +
+						`APs: ${stats.aps}/${stats.inactive}\n` +
+						`users/guests: ${stats.users}/${stats.guests}`
 				}).catch(_.noop);
 			}
 		}, function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
-				text: 'Error talking to controller "' + config.controllers[i].name + '": ' + msg
+				text: `Error talking to controller "${config.controllers[i].name}": ${msg}`
 			}).catch(_.noop);
 		});
 	});
@@ -283,14 +283,14 @@ function showDetails(message) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
-				text: 'Geräte online: ' + (stats.users + stats.guests) + "\n" +
-					'Namen: ' + stats.names.join(', ')
+				text: `Geräte online: ${stats.users + stats.guests}\n` +
+					`Namen: ${stats.names.join(', ')}`
 			}).catch(_.noop);
 		}, function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
-				text: 'Error talking to controller "' + config.controllers[i].name + '": ' + msg
+				text: `Error talking to controller "${config.controllers[i].name}": ${msg}`
 			}).catch(_.noop);
 		});
 	});
@@ -305,8 +305,8 @@ _.each(controllers, function(controller, i) {
 						msg = msg.replace(alarm.ap, alarm.ap_name);
 					}
 					var ts = new Date(alarm.time);
-					var timestring = ts.getDate() + '.' + (ts.getMonth() + 1) + '.' + ts.getFullYear() + ' ' + ts.toLocaleTimeString();
-					var text = 'New alert on "' + config.controllers[i].name + '" at ' + timestring + ':\n' + msg;
+					var timestring = `${ts.getDate()}.${ts.getMonth() + 1}.${ts.getFullYear()} ${ts.toLocaleTimeString()}`;
+					var text = `New alert on "${config.controllers[i].name}" at ${timestring}:\n${msg}`;
 					_.each(config.controllers[i].subscribers, function(subscriber) {
 						bot.sendSticker({
 							chat_id: subscriber,
@@ -328,7 +328,7 @@ _.each(controllers, function(controller, i) {
 function _sendCountdown(chat_id) {
 	bot.sendMessage({
 		chat_id: chat_id,
-		text: 'Aktuelle Anzahl Bewerbungen: ' + countdown
+		text: `Aktuelle Anzahl Bewerbungen: ${countdown}`
 	}).catch(_.noop);
 }
 
@@ -480,7 +480,7 @@ function showEvents(query) {
 	}, function(data) {
 		var events = filterEvents(data, 5, after, before);
 
-		var text = '[Aktuelle AC-Events](' + config.events.html + "):\n";
+		var text = `[Aktuelle AC-Events](${config.events.html}):\n`;
 		var markup;
 
 		if (events.length) {
@@ -495,11 +495,11 @@ function showEvents(query) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
 				if (event.end - event.start > 86400000) { // more than 24h
-					dateString += ' - ' + getShortDateString(event.end, true);
+					dateString += ` - ${getShortDateString(event.end, true)}`;
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
-					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
+					timeString = ` (${getShortTimeString(event.start)} Uhr)`
 				}
-				lines.push(dateString + ': *' + event.summary + '*' + timeString);
+				lines.push(`${dateString}: *${event.summary}*${timeString}`);
 			});
 
 			markup = JSON.stringify({
@@ -559,8 +559,8 @@ function showReservations(message) {
 		var rooms = [];
 		var markup = {inline_keyboard: []};
 		_.each(config.rooms, function(urls, room) {
-			rooms.push('[' + room + '](' + urls.html + ')' + ': ' + lines[room]);
-			markup.inline_keyboard.push([{text: room, callback_data: '/room ' + room}]);
+			rooms.push(`[${room}](${urls.html}): ${lines[room]}`);
+			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
 		});
 		bot.sendMessage({
 			chat_id: message.chat.id,
@@ -571,7 +571,7 @@ function showReservations(message) {
 	});
 
 	_.each(config.rooms, function(urls, room) {
-		cache.get('calendars.' + room, function(callback) {
+		cache.get(`calendars.${room}`, function(callback) {
 			ical.fromURL(urls.ical, {}, function(err, data) {
 				if (err) {
 					console.error(err);
@@ -631,7 +631,7 @@ function showRoomDetails(query) {
 		after = Date.now();
 	}
 
-	cache.get('calendars.' + room, function(callback) {
+	cache.get(`calendars.${room}`, function(callback) {
 		ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
 			if (err) {
 				console.error(err);
@@ -663,18 +663,18 @@ function showRoomDetails(query) {
 				var time = '';
 				if (reservation.end - reservation.start > 86400000) {
 					if (start_time == '00:00' && end_time == '24:00') {
-						time = start_date + ' - ' + end_date;
+						time = `${start_date} - ${end_date}`;
 					} else {
-						time = start_date + ', ' + start_time + ' Uhr - ' + end_date + ', ' + end_time + ' Uhr';
+						time = `${start_date}, ${start_time} Uhr - ${end_date}, ${end_time} Uhr`;
 					}
 				} else {
 					if (start_time == '00:00' && end_time == '24:00') {
 						time = start_date;
 					} else {
-						time = start_date + ', ' + start_time + ' - ' + end_time + ' Uhr';
+						time = `${start_date}, ${start_time} - ${end_time} Uhr`;
 					}
 				}
-				lines.push(time + ': ' + reservation.summary);
+				lines.push(`${time}: ${reservation.summary}`);
 			});
 
 			bot.editMessageText({
@@ -682,20 +682,20 @@ function showRoomDetails(query) {
 				message_id: query.message.message_id,
 				reply_markup: JSON.stringify({
 					inline_keyboard: [[
-						{text: '<< früher', callback_data: '/room ' + room + ' before:' + _.min(reservations, function(reservation) {return reservation.start}).start.getTime()},
-						{text: 'jetzt', callback_data: '/room ' + room},
-						{text: 'später >>', callback_data: '/room ' + room + ' after:' + _.max(reservations, function(reservation) {return reservation.start}).start.getTime()}
+						{text: '<< früher', callback_data: `/room ${room} before:` + _.min(reservations, function(reservation) {return reservation.start}).start.getTime()},
+						{text: 'jetzt', callback_data: `/room ${room}`},
+						{text: 'später >>', callback_data: `/room ${room} after:` + _.max(reservations, function(reservation) {return reservation.start}).start.getTime()}
 					]]
 				}),
 				parse_mode: 'Markdown',
-				text: 'Reservierungen im [' + room + '](' + config.rooms[room].html + "):\n" + lines.join("\n")
+				text: `Reservierungen im [${room}](${config.rooms[room].html}):\n` + lines.join("\n")
 			}).catch(_.noop);
 		} else {
-			var buttons = [{text: 'jetzt', callback_data: '/room ' + room}];
+			var buttons = [{text: 'jetzt', callback_data: `/room ${room}`}];
 			if (before) {
-				buttons.push({text: 'später >>', callback_data: '/room ' + room + ' after:' + (before - 1)});
+				buttons.push({text: 'später >>', callback_data: `/room ${room} after:` + (before - 1)});
 			} else {
-				buttons.unshift({text: '<< früher', callback_data: '/room ' + room + ' before:' + (after + 1)});
+				buttons.unshift({text: '<< früher', callback_data: `/room ${room} before:` + (after + 1)});
 			}
 
 			bot.editMessageText({
@@ -705,7 +705,7 @@ function showRoomDetails(query) {
 					inline_keyboard: [buttons]
 				}),
 				parse_mode: 'Markdown',
-				text: '[' + room + '](' + config.rooms[room].html + ")\n" + 'keine Reservierungen für diesen Zeitraum vorhanden'
+				text: `[${room}](${config.rooms[room].html})\nkeine Reservierungen für diesen Zeitraum vorhanden`
 			}).catch(_.noop);
 		}
 		bot.answerCallbackQuery({
@@ -893,11 +893,11 @@ function showBDSUEvents(query) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
 				if (event.end - event.start > 86400000) { // more than 24h
-					dateString += ' - ' + getShortDateString(event.end, true);
+					dateString += ` - ${getShortDateString(event.end, true)}`;
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
-					timeString = ' (' + getShortTimeString(event.start) + ' Uhr)'
+					timeString = ` (${getShortTimeString(event.start)} Uhr)`
 				}
-				lines.push(dateString + ': [' + event.summary + '](' + event.url + ')' + timeString);
+				lines.push(`${dateString}: [${event.summary}](${event.url})${timeString}`);
 			});
 
 			markup = JSON.stringify({
