@@ -17,15 +17,13 @@ function Unifi(base_url, username, password, site) {
 	};
 	site = site || 'default';
 
-	function ApiCall(path, success, err, params) {
-		success = success || function() {};
-		err     = err     || function() {};
-
+	function ApiCall(path, params) {
 		var options = _.extend({}, defaults, {
 			path: `${base_path}api/login`
 		});
-		_doRequest(options,
-			function(result, data) {
+		return _doRequest(options, {username, password})
+			.then(function(response) {
+				var {result, data} = response;
 				if (result.headers['set-cookie']) {
 					var options = _.extend({}, defaults, {
 						path: base_path + path,
@@ -33,86 +31,75 @@ function Unifi(base_url, username, password, site) {
 							Cookie: result.headers['set-cookie']
 						}
 					});
-					_doRequest(options,
-						function(result, data) {
+					return _doRequest(options, params)
+						.then(function (response) {
+							var {result, data} = response;
 							try {
 								data = JSON.parse(data);
 							} catch (e) {
-								err(result);
-								return;
+								return Promise.reject(e);
 							}
 
 							if (!data.meta || !data.meta.rc) {
-								err('unexpected JSON object');
-								return;
+								return Promise.reject('unexpected JSON object');
 							}
 
 							if (data.meta.rc !== "ok") {
-								err(data.meta.msg);
-								return;
+								return Promise.reject(data.meta.msg);
 							}
 
-							success(data.data, data, result);
-						},
-						err,
-						params
-					);
+							return data.data;
+						});
 				} else {
-					err(data);
+					return Promise.reject(data);
 				}
-			},
-			err,
-			{
-				username: username,
-				password: password
-			}
-		);
+			});
 	};
 	this.ApiCall = ApiCall;
 
 	this.handleAlarms = function(handler) {
-		ApiCall(`api/s/${site}/list/alarm`,
-			function(alarms) {
+		ApiCall(`api/s/${site}/list/alarm`, {_sort: '-time', archived: false})
+			.then(function(alarms) {
 				_.each(alarms, function(alarm) {
 					var handled = handler(alarm);
 					if (handled) {
-						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"});
+						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(_.noop);
 					}
 				});
-			},
-			null,
-			{_sort: '-time', archived: false}
-		);
+			})
+			.catch(_.noop);
 	};
 }
 
-function _doRequest(options, success, err, data) {
-	if (data) {
-		data = JSON.stringify(data);
-		options.headers = _.extend({}, options.headers, {
-			'Content-Type': 'application/x-www-form-urlencoded',
-			'Content-Length': data.length
-		});
-		options.method = 'POST';
-	}
+function _doRequest(options, data) {
+	return new Promise(function(resolve, reject) {
+		if (data) {
+			data = JSON.stringify(data);
+			options.headers = _.extend({}, options.headers, {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				'Content-Length': data.length
+			});
+			options.method = 'POST';
+		}
 
-	var request = https.request(options, function(result) {
-		var data = '';
-		result.on('data', function (chunk) {
-			data += chunk;
+		var request = https.request(options, function(result) {
+			var data = '';
+			result.on('data', function (chunk) {
+				data += chunk;
+			});
+			result.on('end', function() {
+				resolve({result, data});
+			});
 		});
-		result.on('end', function() {
-			success(result, data);
+
+		request.on('error', function(event) {
+			reject(event.message);
 		});
+
+		if (data) {
+			request.write(data);
+		}
+
+		request.end();
 	});
-
-	request.on('error', function(event) {
-		err(event.message);
-	});
-
-	if (data) {
-		request.write(data);
-	}
-
-	request.end();
 }

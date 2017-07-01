@@ -110,7 +110,7 @@ bot.on('inline.query', searchContacts);
 
 function wrapRestrictedCommand(command) {
 	return function(query) {
-		getADUser(query.from.id, function(user) {
+		getADUser(query.from.id).then(function(user) {
 			if (user) {
 				command(query, user);
 			} else {
@@ -127,7 +127,7 @@ function wrapRestrictedCommand(command) {
 					text: text
 				}).catch(_.noop);
 			}
-		}, function() {
+		}).catch(function() {
 			if (query.data) {
 				bot.answerCallbackQuery({
 					callback_query_id: query.id,
@@ -143,9 +143,8 @@ function wrapRestrictedCommand(command) {
 	}
 }
 
-function getADUser(uid, success, onerror) {
-	onerror = onerror || function() {};
-	cache.get(`aduser.${uid}`, function(callback) {
+function getADUser(uid) {
+	return cache.get(`aduser.${uid}`, function(store, reject) {
 		var client = ldap.createClient({
 			url: config.ldap.uri,
 			tlsOptions: {
@@ -155,7 +154,7 @@ function getADUser(uid, success, onerror) {
 		client.bind(config.ldap.binddn, config.ldap.bindpw, function(err, res) {
 			if (err) {
 				console.error(err);
-				onerror();
+				reject();
 				return;
 			}
 
@@ -169,7 +168,7 @@ function getADUser(uid, success, onerror) {
 				if (err) {
 					console.error(err);
 					client.destroy();
-					onerror();
+					reject();
 					return;
 				}
 
@@ -180,24 +179,24 @@ function getADUser(uid, success, onerror) {
 				res.on('error', function(err) {
 					console.error(err);
 					client.destroy();
-					onerror();
+					reject();
 				});
 				res.on('end', function(result) {
 					client.destroy();
 					if (result.status != 0) {
 						console.error(result);
-						onerror();
+						reject();
 					} else {
 						if (data) {
-							callback(data, 86400000);
+							store(data, 86400000);
 						} else {
-							callback(data, 1000);
+							store(data, 1000);
 						}
 					}
 				});
 			});
 		});
-	}, success);
+	});
 }
 
 function runStart(message, user) {
@@ -213,7 +212,7 @@ function showStatus(message) {
 			chat_id: message.chat.id,
 			action: 'typing'
 		}).catch(_.noop);
-		controller.ApiCall('api/s/default/stat/device', function(data) {
+		controller.ApiCall('api/s/default/stat/device').then(function(data) {
 			var stats = {
 				users: 0,
 				guests: 0,
@@ -245,7 +244,7 @@ function showStatus(message) {
 						`users/guests: ${stats.users}/${stats.guests}`
 				}).catch(_.noop);
 			}
-		}, function(msg) {
+		}).catch(function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
@@ -261,7 +260,7 @@ function showDetails(message) {
 			chat_id: message.chat.id,
 			action: 'typing'
 		}).catch(_.noop);
-		controller.ApiCall('api/s/default/stat/sta', function(data) {
+		controller.ApiCall('api/s/default/stat/sta').then(function(data) {
 			var stats = {
 				users: 0,
 				guests: 0,
@@ -286,7 +285,7 @@ function showDetails(message) {
 				text: `Geräte online: ${stats.users + stats.guests}\n` +
 					`Namen: ${stats.names.join(', ')}`
 			}).catch(_.noop);
-		}, function(msg) {
+		}).catch(function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
@@ -469,15 +468,15 @@ function showEvents(query) {
 		after = Date.now();
 	}
 
-	cache.get('calendars.events', function(callback) {
+	cache.get('calendars.events', function(store, reject) {
 		ical.fromURL(config.events.ical, {}, function(err, data) {
 			if (err) {
-				console.error(err);
+				reject(err);
 			} else {
-				callback(data, 120000);
+				store(data, 120000);
 			}
 		});
-	}, function(data) {
+	}).then(function(data) {
 		var events = filterEvents(data, 5, after, before);
 
 		var text = `[Aktuelle AC-Events](${config.events.html}):\n`;
@@ -543,6 +542,8 @@ function showEvents(query) {
 				reply_markup: markup
 			}).catch(_.noop);
 		}
+	}).catch(function(err) {
+		console.error(err);
 	});
 }
 
@@ -552,38 +553,21 @@ function showReservations(message) {
 		action: 'typing'
 	}).catch(_.noop);
 
+	var promises = [];
+
 	var now = new Date();
-	var lines = {};
-
-	var sendResponse = _.after(_.keys(config.rooms).length, function() {
-		var rooms = [];
-		var markup = {inline_keyboard: []};
-		_.each(config.rooms, function(urls, room) {
-			rooms.push(`[${room}](${urls.html}): ${lines[room]}`);
-			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
-		});
-		bot.sendMessage({
-			chat_id: message.chat.id,
-			parse_mode: 'Markdown',
-			text: rooms.join("\n"),
-			reply_markup: JSON.stringify(markup)
-		}).catch(_.noop);
-	});
-
 	_.each(config.rooms, function(urls, room) {
-		cache.get(`calendars.${room}`, function(callback) {
+		promises.push(cache.get(`calendars.${room}`, function(store, reject) {
 			ical.fromURL(urls.ical, {}, function(err, data) {
 				if (err) {
-					console.error(err);
-					lines[room] = 'Fehler beim Laden';
-					sendResponse();
-					return;
+					reject(`Fehler beim Laden von ${room}`);
 				} else {
-					callback(data, 120000);
+					store(data, 120000);
 				}
 			});
-		}, function(data) {
+		}).then(function(data) {
 			var reservations = filterEvents(data, 0, now);
+			var line = '';
 
 			var reservation = reservations.shift();
 			if (reservation) {
@@ -594,20 +578,44 @@ function showReservations(message) {
 						users.push(next.summary.trim());
 						reservation = next;
 					}
-					lines[room] = 'belegt bis '
+					line = 'belegt bis '
 						+ (reservation.end - now > 86400000 ? getShortDateString(reservation.end, true) + ', ' : '')
 						+ getShortTimeString(reservation.end, true) + ' Uhr von ' + _.uniq(users).join(', ');
 				} else {
-					lines[room] = 'frei bis '
+					line = 'frei bis '
 						+ (reservation.start - now > 86400000 ? getShortDateString(reservation.start) + ', ' : '')
 						+ getShortTimeString(reservation.start) + ' Uhr';
 				}
 			} else {
-				lines[room] = 'frei';
+				line = 'frei';
 			}
 
-			sendResponse();
+			return {room, line};
+		}));
+	});
+
+	Promise.all(promises).then(function(results) {
+		var lines = {};
+		var rooms = [];
+		var markup = {inline_keyboard: []};
+
+		_.each(results, function(result) {
+			lines[result.room] = result.line;
 		});
+
+		_.each(config.rooms, function(urls, room) {
+			rooms.push(`[${room}](${urls.html}): ${lines[room]}`);
+			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
+		});
+
+		bot.sendMessage({
+			chat_id: message.chat.id,
+			parse_mode: 'Markdown',
+			text: rooms.join("\n"),
+			reply_markup: JSON.stringify(markup)
+		}).catch(_.noop);
+	}).catch(function(err) {
+		console.error(err);
 	});
 }
 
@@ -631,20 +639,15 @@ function showRoomDetails(query) {
 		after = Date.now();
 	}
 
-	cache.get(`calendars.${room}`, function(callback) {
+	cache.get(`calendars.${room}`, function(store, reject) {
 		ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
 			if (err) {
-				console.error(err);
-				bot.answerCallbackQuery({
-					callback_query_id: query.id,
-					text: 'Fehler beim Laden'
-				}).catch(_.noop);
-				return;
+				reject(err);
 			} else {
-				callback(data, 120000);
+				store(data, 120000);
 			}
 		});
-	}, function(data) {
+	}).then(function(data) {
 		var reservations = filterEvents(data, 5, after, before);
 
 		if (reservations.length) {
@@ -711,21 +714,27 @@ function showRoomDetails(query) {
 		bot.answerCallbackQuery({
 			callback_query_id: query.id
 		}).catch(_.noop);
+	}).catch(function(err) {
+		console.error(err);
+		bot.answerCallbackQuery({
+			callback_query_id: query.id,
+			text: 'Fehler beim Laden'
+		}).catch(_.noop);
 	});
 }
 
-var contacts = [];
-function fetchContacts() {
+function fetchContacts(save, reject) {
 	var client = ldap.createClient({
 		url: config.ldap.uri,
 		tlsOptions: {
 			ca: ca
 		}
 	});
+
 	client.bind(config.ldap.binddn, config.ldap.bindpw, function(err, res) {
 		if (err) {
-			console.error(err);
-			setTimeout(fetchContacts, 60000);
+			client.destroy();
+			reject(err);
 			return;
 		}
 
@@ -737,9 +746,8 @@ function fetchContacts() {
 
 		client.search(config.ldap.basedn, opts, function(err, res) {
 			if (err) {
-				console.error(err);
 				client.destroy();
-				setTimeout(fetchContacts, 60000);
+				reject(err);
 				return;
 			}
 
@@ -748,17 +756,16 @@ function fetchContacts() {
 				data.push(entry.object);
 			});
 			res.on('error', function(err) {
-				console.error(err);
 				client.destroy();
+				reject(err);
 			});
 			res.on('end', function(result) {
-				contacts = _.sortBy(data, 'displayName');
-				setTimeout(fetchContacts, 43200000);
+				client.destroy();
+				save(_.sortBy(data, 'displayName'), 43200000);
 			});
 		});
 	});
 }
-fetchContacts();
 
 function showContactsHelp(message, user) {
 	bot.sendMessage({
@@ -779,7 +786,7 @@ function showContactsHelp(message, user) {
 function searchContacts(query) {
 	var max_results = 15;
 	var next_result;
-	getADUser(query.from.id, function(user) {
+	getADUser(query.from.id).then(function(user) {
 		if (!user) {
 			bot.answerInlineQuery({
 				inline_query_id: query.id,
@@ -790,33 +797,39 @@ function searchContacts(query) {
 				switch_pm_parameter: 'contacts'
 			});
 		} else {
-			var results = _.filter(contacts, function(contact) {
-				return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
-			});
-			if (query.offset) {
-				results = results.splice(query.offset);
-			}
-			if (results.length > max_results) {
-				next_result = max_results + Number.parseInt(query.offset ? query.offset : 0);
-				results = results.splice(0, max_results);
-			}
-			results = _.map(results, function(contact) {
-				return {
-					type: 'contact',
-					id: contact.name,
-					phone_number: contact.mobile,
-					first_name: contact.givenName,
-					last_name: contact.sn
+			cache.get('contacts', fetchContacts).then(function(contacts) {
+				var results = _.filter(contacts, function(contact) {
+					return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
+				});
+				if (query.offset) {
+					results = results.splice(query.offset);
 				}
-			});
-			bot.answerInlineQuery({
-				inline_query_id: query.id,
-				results: results,
-				is_personal: 'true',
-				cache_time: 0,
-				next_offset: next_result
+				if (results.length > max_results) {
+					next_result = max_results + Number.parseInt(query.offset ? query.offset : 0);
+					results = results.splice(0, max_results);
+				}
+				results = _.map(results, function(contact) {
+					return {
+						type: 'contact',
+						id: contact.name,
+						phone_number: contact.mobile,
+						first_name: contact.givenName,
+						last_name: contact.sn
+					}
+				});
+				bot.answerInlineQuery({
+					inline_query_id: query.id,
+					results: results,
+					is_personal: 'true',
+					cache_time: 0,
+					next_offset: next_result
+				});
+			}).catch(function(err) {
+				console.error(err);
 			});
 		}
+	}).catch(function(err) {
+		console.error(err);
 	});
 }
 
@@ -841,41 +854,45 @@ function showBDSUEvents(query) {
 		after = Date.now();
 	}
 
-	cache.get('calendars.bdsu', function(callback) {
-		var events = {};
-		var error = false;
-		function loadIcals(i) {
-			if (i < config.bdsu.length) {
-				ical.fromURL(config.bdsu[i], {}, function(err, data) {
+	cache.get('calendars.bdsu', function(store, reject) {
+		var promises = [];
+
+		_.each(config.bdsu, function(calendar, index) {
+			promises.push(cache.get(`calendars.bdsu.${index}`, function(store, reject) {
+				ical.fromURL(calendar, {}, function(err, data) {
 					if (err) {
-						error = true;
-						console.error(err);
+						Promise.reject(err);
 					} else {
-						_.extend(events, data);
+						store(data, 120000);
 					}
-					loadIcals(i+1);
 				});
-			} else {
-				callback(events, error ? 0 : 120000);
-			}
-		}
-		cache.get('calendars.events', function(callback) {
-			ical.fromURL(config.events.ical, {}, function(err, data) {
-				if (err) {
-					console.error(err);
-				} else {
-					callback(data, 120000);
-				}
-			});
-		}, function(data) {
-			_(data).each(function(event, id) {
-				if (event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)) {
-					events[id] = event;
-				}
-			});
-			loadIcals(0);
+			}));
 		})
-	}, function(data) {
+
+		promises.push(
+			cache.get('calendars.events', function(store, reject) {
+				ical.fromURL(config.events.ical, {}, function(err, data) {
+					if (err) {
+						reject(err);
+					} else {
+						store(data, 120000);
+					}
+				});
+			}).then(function(data) {
+				return _(data).filter(function(event) {
+					return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)
+				});
+			})
+		);
+
+		Promise.all(promises).then(function(calendars) {
+			var events = {};
+			_.each(calendars, function(calendar_events) {
+				_(events).extend(calendar_events);
+			});
+			store(events, 120000);
+		}).catch(reject);
+	}).then(function(data) {
 		var events = filterEvents(data, 5, after, before);
 
 		var text = "Aktuelle BDSU-Treffen:\n";
@@ -941,5 +958,7 @@ function showBDSUEvents(query) {
 				reply_markup: markup
 			}).catch(_.noop);
 		}
+	}).catch(function(err) {
+		console.error(err);
 	});
 }
