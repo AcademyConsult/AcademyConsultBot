@@ -914,7 +914,7 @@ function showBDSUEvents(query) {
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
 					timeString = ` (${getShortTimeString(event.start)} Uhr)`
 				}
-				lines.push(`${dateString}: [${event.summary}](${event.url})${timeString}`);
+				lines.push(`${dateString}: [${event.summary}${event.location ? ` (${event.location})` : ''}](${event.url})${timeString}`);
 			});
 
 			markup = JSON.stringify({
