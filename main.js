@@ -73,7 +73,12 @@ var inline_callbacks = [
 	{
 		pattern: /\/room/,
 		handler: wrapRestrictedCommand(showRoomDetails)
-	}, {
+	},
+	{
+		pattern: /\/buero/,
+		handler: wrapRestrictedCommand(showReservations)
+	},
+	{
 		pattern: /\/events/,
 		handler: wrapRestrictedCommand(showEvents)
 	},
@@ -588,7 +593,8 @@ function showBDSUEvents(query) {
 	);
 }
 
-function showReservations(message) {
+function showReservations(query) {
+	var message = query.data ? query.message : query;
 	startTyping(message.chat.id);
 
 	var promises = [];
@@ -638,12 +644,25 @@ function showReservations(message) {
 			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
 		});
 
-		bot.sendMessage({
-			chat_id: message.chat.id,
-			parse_mode: 'Markdown',
-			text: rooms.join("\n"),
-			reply_markup: JSON.stringify(markup)
-		}).catch(_.noop);
+		if (query.data) {
+			bot.editMessageText({
+				chat_id: query.message.chat.id,
+				message_id: query.message.message_id,
+				parse_mode: 'Markdown',
+				text: rooms.join("\n"),
+				reply_markup: JSON.stringify(markup)
+			}).catch(_.noop);
+			bot.answerCallbackQuery({
+				callback_query_id: query.id
+			}).catch(_.noop);
+		} else {
+			bot.sendMessage({
+				chat_id: message.chat.id,
+				parse_mode: 'Markdown',
+				text: rooms.join("\n"),
+				reply_markup: JSON.stringify(markup)
+			}).catch(_.noop);
+		}
 	}).catch(function(err) {
 		console.error(err);
 	});
@@ -707,6 +726,8 @@ function showRoomDetails(query) {
 						{text: '<< früher', callback_data: `/room ${room} before:` + _.min(reservations, function(reservation) {return reservation.start}).start.getTime()},
 						{text: 'jetzt', callback_data: `/room ${room}`},
 						{text: 'später >>', callback_data: `/room ${room} after:` + _.max(reservations, function(reservation) {return reservation.start}).start.getTime()}
+					], [
+						{text: 'Alle Räume', callback_data: '/buero'}
 					]]
 				}),
 				parse_mode: 'Markdown',
@@ -724,7 +745,7 @@ function showRoomDetails(query) {
 				chat_id: query.message.chat.id,
 				message_id: query.message.message_id,
 				reply_markup: JSON.stringify({
-					inline_keyboard: [buttons]
+					inline_keyboard: [buttons, [{text: 'Alle Räume', callback_data: '/buero'}]]
 				}),
 				parse_mode: 'Markdown',
 				text: `[${room}](${config.rooms[room].html})\nkeine Reservierungen für diesen Zeitraum vorhanden`
