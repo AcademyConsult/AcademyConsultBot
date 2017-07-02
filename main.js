@@ -199,6 +199,13 @@ function getADUser(uid) {
 	});
 }
 
+function startTyping(chat_id) {
+	bot.sendChatAction({
+		chat_id: chat_id,
+		action: 'typing'
+	}).catch(_.noop);
+}
+
 function runStart(message, user) {
 	bot.sendMessage({
 		chat_id: message.chat.id,
@@ -206,93 +213,82 @@ function runStart(message, user) {
 	}).catch(_.noop);
 }
 
-function showStatus(message) {
+function _showControllerInfos(message, endpoint, parser, formatter) {
 	_.each(controllers, function(controller, i) {
-		bot.sendChatAction({
-			chat_id: message.chat.id,
-			action: 'typing'
-		}).catch(_.noop);
-		controller.ApiCall('api/s/default/stat/device').then(function(data) {
+		startTyping(message.chat.id);
+		controller.ApiCall(endpoint).then(function(data) {
 			var stats = {
 				users: 0,
 				guests: 0,
 				aps: 0,
-				inactive: 0
-			}
-			_.each(data, function(ap) {
-				if (ap.state == 1) {
-					stats.aps++;
-					stats.users += ap['user-num_sta'];
-					stats.guests += ap['guest-num_sta'];
-				} else {
-					stats.inactive++;
-				}
-			});
-
-			if (config.controllers[i].whitelist && config.controllers[i].whitelist.indexOf(message.chat.id) == -1) {
-				bot.sendMessage({
-					chat_id: message.chat.id,
-					reply_to_message_id: message.message_id,
-					text: `Geräte online: ${stats.users + stats.guests}`
-				}).catch(_.noop);
-			} else {
-				bot.sendMessage({
-					chat_id: message.chat.id,
-					reply_to_message_id: message.message_id,
-					text: `UniFi-Controller "${config.controllers[i].name}":\n` +
-						`APs: ${stats.aps}/${stats.inactive}\n` +
-						`users/guests: ${stats.users}/${stats.guests}`
-				}).catch(_.noop);
-			}
-		}).catch(function(msg) {
-			bot.sendMessage({
-				chat_id: message.chat.id,
-				reply_to_message_id: message.message_id,
-				text: `Error talking to controller "${config.controllers[i].name}": ${msg}`
-			}).catch(_.noop);
-		});
-	});
-}
-
-function showDetails(message) {
-	_.each(controllers, function(controller, i) {
-		bot.sendChatAction({
-			chat_id: message.chat.id,
-			action: 'typing'
-		}).catch(_.noop);
-		controller.ApiCall('api/s/default/stat/sta').then(function(data) {
-			var stats = {
-				users: 0,
-				guests: 0,
+				inactive: 0,
 				names: []
 			}
-			_.each(data, function(client) {
-				if (client._is_guest_by_uap) {
-					stats.guests++;
-				} else {
-					stats.users++;
-				}
-				if (client.name) {
-					stats.names.push(client.name);
-				}
-			});
+			_.each(data, parser, stats);
 
 			stats.names = _.uniq(_.sortBy(stats.names, function(name) {return name}), true);
 
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
-				text: `Geräte online: ${stats.users + stats.guests}\n` +
-					`Namen: ${stats.names.join(', ')}`
+				text: formatter(stats, controller, i)
 			}).catch(_.noop);
 		}).catch(function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
-				text: `Error talking to controller "${config.controllers[i].name}": ${msg}`
+				text: `Controller nicht erreichbar "${config.controllers[i].name}": ${msg}`
 			}).catch(_.noop);
 		});
 	});
+}
+
+function showDetails(message) {
+	_showControllerInfos(
+		message,
+		'api/s/default/stat/sta',
+		function(client) {
+			var stats = this;
+			if (client._is_guest_by_uap) {
+				stats.guests++;
+			} else {
+				stats.users++;
+			}
+			if (client.name) {
+				stats.names.push(client.name);
+			}
+		},
+		function(stats) {
+			return `Geräte online: ${stats.users + stats.guests}\n` +
+				`Namen: ${stats.names.join(', ')}`;
+		}
+	);
+}
+
+function showStatus(message) {
+	_showControllerInfos(
+		message,
+		'api/s/default/stat/device',
+		function(ap) {
+			var stats = this;
+			if (ap.state == 1) {
+				stats.aps++;
+				stats.users += ap['user-num_sta'];
+				stats.guests += ap['guest-num_sta'];
+			} else {
+				stats.inactive++;
+			}
+		},
+		function(stats, controller, i) {
+			if (config.controllers[i].whitelist && config.controllers[i].whitelist.indexOf(message.chat.id) == -1) {
+				return `Geräte online: ${stats.users + stats.guests}`;
+			} else {
+				return `UniFi-Controller "${config.controllers[i].name}":\n` +
+					`APs: ${stats.aps}/${stats.inactive}\n` +
+					`users/guests: ${stats.users}/${stats.guests}`;
+			}
+		}
+	);
 }
 
 _.each(controllers, function(controller, i) {
@@ -366,10 +362,7 @@ function _updateCountdown(callback) {
 }
 
 function showApplicants(message) {
-	bot.sendChatAction({
-		chat_id: message.chat.id,
-		action: 'typing'
-	}).catch(_.noop);
+	startTyping(message.chat.id);
 	var chat_id = message.chat.id;
 	_updateCountdown(function(changed) {
 		if (!changed || subscribers.indexOf(chat_id) == -1) {
@@ -384,13 +377,13 @@ function subscribe(message) {
 		subscribers.push(message.chat.id);
 		bot.sendMessage({
 			chat_id: message.chat.id,
-			text: 'Du erhälst jetzt automatische Updates, wenn neue Bewerbungen rein kommen'
+			text: 'Du erhälst jetzt automatische Updates, wenn neue Bewerbungen rein kommen',
 		}).catch(_.noop);
 	} else {
 		subscribers.splice(index, 1);
 		bot.sendMessage({
 			chat_id: message.chat.id,
-			text: 'Automatische Updates deaktiviert'
+			text: 'Automatische Updates deaktiviert',
 		}).catch(_.noop);
 	}
 }
@@ -447,10 +440,23 @@ function filterEvents(events, count, after, before) {
 	return count ? results.splice(ascending ? 0 : -count, count) : results;
 }
 
-function showEvents(query) {
+function loadCalendar(cache_key, url, ttl) {
+	ttl = ttl || 120000;
+	return cache.get(cache_key, function(store, reject) {
+		ical.fromURL(url, {}, function(err, data) {
+			if (err) {
+				reject(err);
+			} else {
+				store(data, ttl);
+			}
+		});
+	});
+}
+
+function _renderPaginatedCalendar(query, command, calendar_promise, header, line_renderer) {
 	var after, before;
 	if (query.data) {
-		var parts = query.data.match(/\/events(?: after:([0-9]+))?(?: before:([0-9]+))?/);
+		var parts = query.data.match(new RegExp(`\/${command}(?: after:([0-9]+))?(?: before:([0-9]+))?`));
 		after = Number.parseInt(parts[1]);
 		before = Number.parseInt(parts[2]);
 		message = query.message;
@@ -459,27 +465,16 @@ function showEvents(query) {
 		query = false;
 	}
 
-	bot.sendChatAction({
-		chat_id: message.chat.id,
-		action: 'typing'
-	}).catch(_.noop);
+	startTyping(message.chat.id);
 
 	if (!after && !before) {
 		after = Date.now();
 	}
 
-	cache.get('calendars.events', function(store, reject) {
-		ical.fromURL(config.events.ical, {}, function(err, data) {
-			if (err) {
-				reject(err);
-			} else {
-				store(data, 120000);
-			}
-		});
-	}).then(function(data) {
+	calendar_promise.then(function(data) {
 		var events = filterEvents(data, 5, after, before);
 
-		var text = `[Aktuelle AC-Events](${config.events.html}):\n`;
+		var text = header;
 		var markup;
 
 		if (events.length) {
@@ -498,23 +493,23 @@ function showEvents(query) {
 				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
 					timeString = ` (${getShortTimeString(event.start)} Uhr)`
 				}
-				lines.push(`${dateString}: *${event.summary}*${timeString}`);
+				lines.push(line_renderer(dateString, timeString, event));
 			});
 
 			markup = JSON.stringify({
 				inline_keyboard: [[
-					{text: '<< früher', callback_data: '/events before:' + _.min(events, function(event) {return event.start}).start.getTime()},
-					{text: 'jetzt', callback_data: '/events'},
-					{text: 'später >>', callback_data: '/events after:' + _.max(events, function(event) {return event.start}).start.getTime()}
+					{text: '<< früher', callback_data: `/${command} before:` + _.min(events, function(event) {return event.start}).start.getTime()},
+					{text: 'jetzt', callback_data: `/${command}`},
+					{text: 'später >>', callback_data: `/${command} after:` + _.max(events, function(event) {return event.start}).start.getTime()}
 				]]
 			});
 			text += lines.join("\n");
 		} else {
-			var buttons = [{text: 'jetzt', callback_data: '/events'}];
+			var buttons = [{text: 'jetzt', callback_data: `/${command}`}];
 			if (before) {
-				buttons.push({text: 'später >>', callback_data: '/events after:' + (before - 1)});
+				buttons.push({text: 'später >>', callback_data: `/${command} after:` + (before - 1)});
 			} else {
-				buttons.unshift({text: '<< früher', callback_data: '/events before:' + (after + 1)});
+				buttons.unshift({text: '<< früher', callback_data: `/${command} before:` + (after + 1)});
 			}
 
 			markup = JSON.stringify({
@@ -547,25 +542,60 @@ function showEvents(query) {
 	});
 }
 
+function showEvents(query) {
+	_renderPaginatedCalendar(
+		query,
+		'events',
+		loadCalendar('calendars.events', config.events.ical),
+		`[Aktuelle AC-Events](${config.events.html}):\n`,
+		function(dateString, timeString, event) {
+			return `${dateString}: *${event.summary}*${timeString}`;
+		}
+	);
+}
+
+function showBDSUEvents(query) {
+	var calendars = cache.get('calendars.bdsu', function(store, reject) {
+		var promises = [];
+
+		_.each(config.bdsu, function(calendar, index) {
+			promises.push(loadCalendar(`calendars.bdsu.${index}`, calendar));
+		});
+
+		promises.push(loadCalendar('calendars.events', config.events.ical).then(function(data) {
+			return _(data).filter(function(event) {
+				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)
+			});
+		}));
+
+		Promise.all(promises).then(function(calendars) {
+			var events = {};
+			_.each(calendars, function(calendar_events) {
+				_(events).extend(calendar_events);
+			});
+			store(events, 120000);
+		}).catch(reject);
+	});
+
+	_renderPaginatedCalendar(
+		query,
+		'bdsu',
+		calendars,
+		"Aktuelle BDSU-Treffen:\n",
+		function(dateString, timeString, event) {
+			return `${dateString}: [${event.summary}${event.location ? ` (${event.location})` : ''}](${event.url})${timeString}`;
+		}
+	);
+}
+
 function showReservations(message) {
-	bot.sendChatAction({
-		chat_id: message.chat.id,
-		action: 'typing'
-	}).catch(_.noop);
+	startTyping(message.chat.id);
 
 	var promises = [];
 
 	var now = new Date();
 	_.each(config.rooms, function(urls, room) {
-		promises.push(cache.get(`calendars.${room}`, function(store, reject) {
-			ical.fromURL(urls.ical, {}, function(err, data) {
-				if (err) {
-					reject(`Fehler beim Laden von ${room}`);
-				} else {
-					store(data, 120000);
-				}
-			});
-		}).then(function(data) {
+		promises.push(loadCalendar(`calendars.${room}`, urls.ical).then(function(data) {
 			var reservations = filterEvents(data, 0, now);
 			var line = '';
 
@@ -630,24 +660,13 @@ function showRoomDetails(query) {
 		return;
 	}
 
-	bot.sendChatAction({
-		chat_id: query.message.chat.id,
-		action: 'typing'
-	}).catch(_.noop);
+	startTyping(query.message.chat.id);
 
 	if (!after && !before) {
 		after = Date.now();
 	}
 
-	cache.get(`calendars.${room}`, function(store, reject) {
-		ical.fromURL(config.rooms[room].ical, {}, function(err, data) {
-			if (err) {
-				reject(err);
-			} else {
-				store(data, 120000);
-			}
-		});
-	}).then(function(data) {
+	loadCalendar(`calendars.${room}`, config.rooms[room].ical).then(function(data) {
 		var reservations = filterEvents(data, 5, after, before);
 
 		if (reservations.length) {
@@ -827,136 +846,6 @@ function searchContacts(query) {
 			}).catch(function(err) {
 				console.error(err);
 			});
-		}
-	}).catch(function(err) {
-		console.error(err);
-	});
-}
-
-function showBDSUEvents(query) {
-	var after, before;
-	if (query.data) {
-		var parts = query.data.match(/\/bdsu(?: after:([0-9]+))?(?: before:([0-9]+))?/);
-		after = Number.parseInt(parts[1]);
-		before = Number.parseInt(parts[2]);
-		message = query.message;
-	} else {
-		message = query;
-		query = false;
-	}
-
-	bot.sendChatAction({
-		chat_id: message.chat.id,
-		action: 'typing'
-	}).catch(_.noop);
-
-	if (!after && !before) {
-		after = Date.now();
-	}
-
-	cache.get('calendars.bdsu', function(store, reject) {
-		var promises = [];
-
-		_.each(config.bdsu, function(calendar, index) {
-			promises.push(cache.get(`calendars.bdsu.${index}`, function(store, reject) {
-				ical.fromURL(calendar, {}, function(err, data) {
-					if (err) {
-						Promise.reject(err);
-					} else {
-						store(data, 120000);
-					}
-				});
-			}));
-		})
-
-		promises.push(
-			cache.get('calendars.events', function(store, reject) {
-				ical.fromURL(config.events.ical, {}, function(err, data) {
-					if (err) {
-						reject(err);
-					} else {
-						store(data, 120000);
-					}
-				});
-			}).then(function(data) {
-				return _(data).filter(function(event) {
-					return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)
-				});
-			})
-		);
-
-		Promise.all(promises).then(function(calendars) {
-			var events = {};
-			_.each(calendars, function(calendar_events) {
-				_(events).extend(calendar_events);
-			});
-			store(events, 120000);
-		}).catch(reject);
-	}).then(function(data) {
-		var events = filterEvents(data, 5, after, before);
-
-		var text = "Aktuelle BDSU-Treffen:\n";
-		var markup;
-
-		if (events.length) {
-			if (before) {
-				events = events.splice(-5);
-			} else {
-				events = events.splice(0, 5);
-			}
-
-			var lines = [];
-			_.each(events, function(event) {
-				var dateString = getShortDateString(event.start);
-				var timeString = '';
-				if (event.end - event.start > 86400000) { // more than 24h
-					dateString += ` - ${getShortDateString(event.end, true)}`;
-				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
-					timeString = ` (${getShortTimeString(event.start)} Uhr)`
-				}
-				lines.push(`${dateString}: [${event.summary}${event.location ? ` (${event.location})` : ''}](${event.url})${timeString}`);
-			});
-
-			markup = JSON.stringify({
-				inline_keyboard: [[
-					{text: '<< früher', callback_data: '/bdsu before:' + _.min(events, function(event) {return event.start}).start.getTime()},
-					{text: 'jetzt', callback_data: '/bdsu'},
-					{text: 'später >>', callback_data: '/bdsu after:' + _.max(events, function(event) {return event.start}).end.getTime()}
-				]]
-			});
-			text += lines.join("\n");
-		} else {
-			var buttons = [{text: 'jetzt', callback_data: '/bdsu'}];
-			if (before) {
-				buttons.push({text: 'später >>', callback_data: '/bdsu after:' + (before - 1)});
-			} else {
-				buttons.unshift({text: '<< früher', callback_data: '/bdsu before:' + (after + 1)});
-			}
-
-			markup = JSON.stringify({
-				inline_keyboard: [buttons]
-			});
-			text += 'Keine Events in diesem Zeitraum vorhanden';
-		}
-
-		if (query) {
-			bot.editMessageText({
-				chat_id: query.message.chat.id,
-				message_id: query.message.message_id,
-				reply_markup: markup,
-				parse_mode: 'Markdown',
-				text: text
-			}).catch(_.noop);
-			bot.answerCallbackQuery({
-				callback_query_id: query.id
-			}).catch(_.noop);
-		} else {
-			bot.sendMessage({
-				chat_id: message.chat.id,
-				parse_mode: 'Markdown',
-				text: text,
-				reply_markup: markup
-			}).catch(_.noop);
 		}
 	}).catch(function(err) {
 		console.error(err);
