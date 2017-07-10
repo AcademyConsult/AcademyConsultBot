@@ -41,6 +41,10 @@
 		"host": "www.example.com",
 		"path": "/path/to/data"
 	},
+	"group": {
+		"id": "-12345",
+		"name": "Academy Consult"
+	},
 	"ldap": {
 		"uri": "ldaps://activedirectory.example.com",
 		"binddn": "user@activedirectory.example.com",

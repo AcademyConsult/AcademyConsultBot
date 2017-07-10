@@ -72,6 +72,9 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
 * `bdsu`: Array - iCal-URLs für BDSU-Events (`/bdsu`)
 * `rooms`: Object - `ical` und `html` URLs für alle Raumkalender mit Raumnamen als Keys (`/buero`)
 * `countdown`: Object - URL zum API-Endpunkt zum Abfragen der Bewerberzahlen (`/bewerbungen`, `/countdown`)
+* `group`: Object - Vereinsgruppe, zu der alle neuen Mitglieder automatisch eingeladen werden sollen
+  * `id`: Int/String - Telegram-ID/Name der Gruppe
+  * `name`: String - Anzeigename der Gruppe für Einladungstext
 * `ldap`: Object - Konfiguration für LDAP-Verbindung
   * `uri`: String - URI zum LDAP-Server, inkl. Schema
   * `binddn`: String - DN oder userPrincipalName für Login

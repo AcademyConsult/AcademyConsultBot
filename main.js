@@ -211,11 +211,39 @@ function startTyping(chat_id) {
 	}).catch(_.noop);
 }
 
+function inviteUserToGroup(user_id, group_id, group_name) {
+	cache.get(`inviteLink.${group_id}`, function(resolve, reject) {
+		bot.exportChatInviteLink({chat_id: group_id}).then(function(inviteLink) {
+			resolve(inviteLink, 86400000);
+		}).catch(reject);
+	}).then(function(inviteLink) {
+		bot.sendMessage({
+			chat_id: user_id,
+			parse_mode: 'Markdown',
+			text: `Tippe hier, um [der "${group_name}"-Gruppe beizutreten](${inviteLink}).`
+		}).catch(_.noop);
+	}).catch(function(error) {
+		console.error(error);
+	});
+}
+
 function runStart(message, user) {
-	bot.sendMessage({
-		chat_id: message.chat.id,
-		text: `Hallo ${user.givenName}! Was kann ich für dich tun?`
-	}).catch(_.noop);
+	if (message.from.id === message.chat.id) {
+		bot.sendMessage({
+			chat_id: message.from.id,
+			text: `Hallo ${user.givenName}! Was kann ich für dich tun?`
+		}).catch(_.noop);
+
+		var _inviteUser = function() {
+			inviteUserToGroup(message.from.id, config.group.id, config.group.name);
+		};
+
+		bot.getChatMember({chat_id: config.group.id, user_id: message.from.id}).then(function(member) {
+			if (member && member.status == 'left') {
+				_inviteUser();
+			}
+		}).catch(_inviteUser); // user was never in the group before
+	}
 }
 
 function _showControllerInfos(message, endpoint, parser, formatter) {
