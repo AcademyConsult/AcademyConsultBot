@@ -50,6 +50,10 @@ durchsucht und Treffer als Ergebnisse zur Auswahl angezeigt. Ausgewählte Treffe
 werden als Kontakte inkl. Handynummer (AD-Attribut `mobile`) an den aktuellen
 Chat gesendet.
 
+### MV-Beauftragter
+Durch Eingabe des Commands `/mv` wird der durch Leerzeichen getrennte, **direkt dahinter** folgende Text per Mail
+an den MV-Beauftragten gesendet. 
+
 ## Ausführung
 Der Bot kann als Docker-Container gebaut und gestartet werden mit einem einfachen
 ```
@@ -82,6 +86,11 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `bindpw`: String - Passwort für Login
   * `uid_attribute`: String - LDAP-Attribut, in dem die Telegram-Benutzer-ID gespeichert ist
   * `basedn`: String - DN auf den die Suche nach Benutzerobjekten eingeschränkt werden soll
+* `nodemailer_setup`: Object - Konfiguration des Mailaccounts für das MV-Feature 
+  * `host`: String - IP des Mail Host
+  * `port`: Int
+* `mv_beauftragter`: Object
+  * `mail`: String - E-Mailadresse des MV-Beauftragten
 
 Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
 des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#10)
