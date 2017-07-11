@@ -123,14 +123,16 @@ function wrapRestrictedCommand(command) {
 			} else {
 				var message = query.message || query;
 				var text = "Dieser Bot ist nur für Mitglieder von Academy Consult München e.V. verfügbar.\n";
+				var parse_mode = undefined;
 				if (query.from.id != message.chat.id) {
 					text += `Bitte schreibe mir eine private Nachricht an @${config.name}, um dich freizuschalten.`;
 				} else {
 					text += `Bitte [logge dich hier ein](https://www.acintern.de/telegram?id=${query.from.id}), um dich freizuschalten.`;
+					parse_mode = 'Markdown';
 				}
 				bot.sendMessage({
 					chat_id: message.chat.id,
-					parse_mode: 'Markdown',
+					parse_mode: parse_mode,
 					text: text
 				}).catch(_.noop);
 			}
