@@ -98,6 +98,8 @@ bot.on('message', function(message) {
 				command.handler(message);
 			}
 		});
+	} else if (message && message.chat && message.chat.id == config.group.id && message.new_chat_members) {
+		verifyNewChatMembers(message);
 	}
 });
 
@@ -244,6 +246,31 @@ function runStart(message, user) {
 			}
 		}).catch(_inviteUser); // user was never in the group before
 	}
+}
+
+function verifyNewChatMembers(message) {
+	var promises = _(message.new_chat_members).map(function(member) {
+		return getADUser(member.id).then(function(user) {
+			return {user, member};
+		});
+	});
+	Promise.all(promises).then(function(users) {
+		var names = _(users).filter(function(user) {
+			return !user.user;
+		}).map(function(user) {
+			return `"${user.member.first_name}"`;
+		});
+
+		if (names.length) {
+			bot.sendMessage({
+				chat_id: message.chat.id,
+				reply_to_message_id: message.message_id,
+				text: `Willkommen ${names.join(', ')}!\nLeider kenne ich ${names.length == 1 ? 'dich' : 'euch'} noch gar nicht. `
+					+ `Bitte ${names.length == 1 ? 'schreibe' : 'schreibt'} mir eine private Nachricht an @AcademyConsultBot, `
+					+ `um ${names.length == 1 ? 'dich' : 'euch'} vorzustellen!`
+			}).catch(_.noop);
+		}
+	});
 }
 
 function _showControllerInfos(message, endpoint, parser, formatter) {
