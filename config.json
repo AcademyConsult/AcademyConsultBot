@@ -1,4 +1,5 @@
 {
+	"name": "AcademyConsultBot",
 	"token": "123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHI",
 	"timeout": 100,
 	"controllers": [

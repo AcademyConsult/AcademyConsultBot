@@ -124,7 +124,7 @@ function wrapRestrictedCommand(command) {
 				var message = query.message || query;
 				var text = "Dieser Bot ist nur für Mitglieder von Academy Consult München e.V. verfügbar.\n";
 				if (query.from.id != message.chat.id) {
-					text += "Bitte schreibe mir eine private Nachricht an @AcademyConsultBot, um dich freizuschalten.";
+					text += `Bitte schreibe mir eine private Nachricht an @${config.name}, um dich freizuschalten.`;
 				} else {
 					text += `Bitte [logge dich hier ein](https://www.acintern.de/telegram?id=${query.from.id}), um dich freizuschalten.`;
 				}
@@ -266,7 +266,7 @@ function verifyNewChatMembers(message) {
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
 				text: `Willkommen ${names.join(', ')}!\nLeider kenne ich ${names.length == 1 ? 'dich' : 'euch'} noch gar nicht. `
-					+ `Bitte ${names.length == 1 ? 'schreibe' : 'schreibt'} mir eine private Nachricht an @AcademyConsultBot, `
+					+ `Bitte ${names.length == 1 ? 'schreibe' : 'schreibt'} mir eine private Nachricht an @${config.name}, `
 					+ `um ${names.length == 1 ? 'dich' : 'euch'} vorzustellen!`
 			}).catch(_.noop);
 		}
@@ -866,7 +866,7 @@ function showContactsHelp(message, user) {
 	bot.sendMessage({
 		chat_id: message.chat.id,
 		text: "Du kannst in jedem Chat nach Telefonnummern von AClern suchen und sie direkt mit deinem Gegenüber teilen.\n"
-			+ "Dazu musst du nur in deine Eingabezeile \"@AcademyConsultBot\" gefolgt von einem Namen eingeben. "
+			+ `Dazu musst du nur in deine Eingabezeile \"@${config.name}\" gefolgt von einem Namen eingeben. `
 			+ "Es werden dabei nur Kontakte angezeigt, für die eine Handynummer im SharePoint hinterlegt wurde!\n"
 			+ "Für ein Beispiel drücke einen der Buttons:",
 		reply_markup: JSON.stringify({

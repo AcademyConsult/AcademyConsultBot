@@ -59,6 +59,7 @@ docker-compose up -d
 ### Konfiguration
 Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenommen:
 
+* `name`: String - Benutzernamen des Bots (ohne führendes `@`)
 * `token`: String - [API-Token für Telegram](https://core.telegram.org/bots/api#authorizing-your-bot)
 * `timeout`: Int - Timeout für [`getUpdates`](https://core.telegram.org/bots/api#getupdates)
 * `controllers`: Array - von UniFi-Controllern, die abgefragt werden sollen
