@@ -117,7 +117,20 @@ bot.on('inline.query', searchContacts);
 
 function wrapRestrictedCommand(command) {
 	return function(query) {
-		getADUser(query.from.id).then(function(user) {
+		getADUser(query.from.id).catch(function(error) {
+			if (query.data) {
+				bot.answerCallbackQuery({
+					callback_query_id: query.id,
+					text: 'Fehler beim Laden der Benutzerdaten'
+				}).catch(_.noop);
+			} else {
+				bot.sendMessage({
+					chat_id: query.chat.id,
+					text: 'Fehler beim Laden der Benutzerdaten',
+				}).catch(_.noop);
+			}
+			return Promise.reject(error);
+		}).then(function(user) {
 			if (user) {
 				command(query, user);
 			} else {
@@ -136,18 +149,8 @@ function wrapRestrictedCommand(command) {
 					text: text
 				}).catch(_.noop);
 			}
-		}).catch(function() {
-			if (query.data) {
-				bot.answerCallbackQuery({
-					callback_query_id: query.id,
-					text: 'Fehler beim Laden der Benutzerdaten'
-				}).catch(_.noop);
-			} else {
-				bot.sendMessage({
-					chat_id: query.chat.id,
-					text: 'Fehler beim Laden der Benutzerdaten',
-				}).catch(_.noop);
-			}
+		}).catch(function(error) {
+			console.error(error);
 		});
 	}
 }
@@ -160,10 +163,10 @@ function getADUser(uid) {
 				ca: ca
 			}
 		});
+		client.addListener('error', reject);
 		client.bind(config.ldap.binddn, config.ldap.bindpw, function(err, res) {
 			if (err) {
-				console.error(err);
-				reject();
+				reject(err);
 				return;
 			}
 
@@ -175,9 +178,8 @@ function getADUser(uid) {
 
 			client.search(config.ldap.basedn, opts, function(err, res) {
 				if (err) {
-					console.error(err);
 					client.destroy();
-					reject();
+					reject(err);
 					return;
 				}
 
@@ -186,15 +188,13 @@ function getADUser(uid) {
 					data = entry.object;
 				});
 				res.on('error', function(err) {
-					console.error(err);
 					client.destroy();
-					reject();
+					reject(err);
 				});
 				res.on('end', function(result) {
 					client.destroy();
 					if (result.status != 0) {
-						console.error(result);
-						reject();
+						reject(result);
 					} else {
 						if (data) {
 							store(data, 86400000);
@@ -254,6 +254,8 @@ function verifyNewChatMembers(message) {
 	var promises = _(message.new_chat_members).map(function(member) {
 		return getADUser(member.id).then(function(user) {
 			return {user, member};
+		}).catch(function(err) {
+			console.error(err);
 		});
 	});
 	Promise.all(promises).then(function(users) {
