@@ -243,7 +243,13 @@ function runStart(message, user) {
 		};
 
 		bot.getChatMember({chat_id: config.group.id, user_id: message.from.id}).then(function(member) {
-			if (member && member.status == 'left') {
+			if (member && member.status == 'kicked') {
+				bot.unbanChatMember({
+					chat_id: config.group.id,
+					user_id: message.from.id
+				});
+			}
+			if (member && (member.status == 'left' || member.status == 'kicked')) {
 				_inviteUser();
 			}
 		}).catch(_inviteUser); // user was never in the group before
@@ -256,24 +262,20 @@ function verifyNewChatMembers(message) {
 			return {user, member};
 		}).catch(function(err) {
 			console.error(err);
+			return {user: false, member};
 		});
 	});
 	Promise.all(promises).then(function(users) {
-		var names = _(users).filter(function(user) {
+		_.chain(users).filter(function(user) {
 			return !user.user;
-		}).map(function(user) {
-			return `"${user.member.first_name}"`;
-		});
-
-		if (names.length) {
-			bot.sendMessage({
+		}).each(function(user) {
+			bot.kickChatMember({
 				chat_id: message.chat.id,
-				reply_to_message_id: message.message_id,
-				text: `Willkommen ${names.join(', ')}!\nLeider kenne ich ${names.length == 1 ? 'dich' : 'euch'} noch gar nicht. `
-					+ `Bitte ${names.length == 1 ? 'schreibe' : 'schreibt'} mir eine private Nachricht an @${config.name}, `
-					+ `um ${names.length == 1 ? 'dich' : 'euch'} vorzustellen!`
+				user_id: user.member.id
 			}).catch(_.noop);
-		}
+		});
+	}).catch(function(err) {
+		console.error(err);
 	});
 }
 
