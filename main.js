@@ -32,39 +32,39 @@ for (i = 0; i < config.controllers.length; i++) {
 
 var commands = [
 	{
-		pattern: /\/start/,
+		name: '/start',
 		handler: wrapRestrictedCommand(runStart)
 	},
 	{
-		pattern: /\/status/,
+		name: '/status',
 		handler: wrapRestrictedCommand(showStatus)
 	},
 	{
-		pattern: /\/details/,
+		name: '/details',
 		handler: wrapRestrictedCommand(showDetails)
 	},
 	{
-		pattern: /\/bewerbungen/,
+		name: '/bewerbungen',
 		handler: wrapRestrictedCommand(showApplicants)
 	},
 	{
-		pattern: /\/countdown/,
+		name: '/countdown',
 		handler: wrapRestrictedCommand(subscribe)
 	},
 	{
-		pattern: /\/events/,
+		name: '/events',
 		handler: wrapRestrictedCommand(showEvents)
 	},
 	{
-		pattern: /\/buero/,
+		name: '/buero',
 		handler: wrapRestrictedCommand(showReservations)
 	},
 	{
-		pattern: /\/kontakte/,
+		name: '/kontakte',
 		handler: wrapRestrictedCommand(showContactsHelp)
 	},
 	{
-		pattern: /\/bdsu/,
+		name: '/bdsu',
 		handler: wrapRestrictedCommand(showBDSUEvents)
 	}
 ];
@@ -92,11 +92,14 @@ var subscribers = [];
 var countdown = 0;
 
 bot.on('message', function(message) {
-	if (message && message.text) {
-		_.each(commands, function(command) {
-			if (message.text.match(command.pattern)) {
-				command.handler(message);
-			}
+	if (message && message.text && message.entities) {
+		message.entities.filter(entity => entity.type === 'bot_command').forEach(entity => {
+			const command_text = message.text.substr(entity.offset, entity.length);
+			commands.forEach(command => {
+				if (command.name === command_text) {
+					command.handler(message);
+				}
+			});
 		});
 	} else if (message && message.chat && message.chat.id == config.group.id && message.new_chat_members) {
 		verifyNewChatMembers(message);
