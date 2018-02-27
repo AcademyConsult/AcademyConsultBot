@@ -52,5 +52,12 @@
 		"bindpw": "",
 		"uid_attribute": "extensionAttribute1",
 		"basedn": "DC=activedirectory,DC=example,DC=com"
+	},
+	"nodemailer_setup": {
+		"host": "127.0.0.1",
+		"port": 25
+	},
+	"mv_beauftragter": {
+		"mail": "max.mustermann@academyconsult.de"
 	}
 }

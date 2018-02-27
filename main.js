@@ -6,6 +6,7 @@ var _        = require('underscore')._;
 var Cache    = require('./cache');
 var ldap     = require('ldapjs');
 var fs       = require('fs');
+var nodemailer = require('nodemailer');
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
 var config = require('./config.json');
@@ -66,6 +67,10 @@ var commands = [
 	{
 		name: '/bdsu',
 		handler: wrapRestrictedCommand(showBDSUEvents)
+	},
+	{
+		pattern: /\/mv/,
+		handler: wrapRestrictedCommand(sendMVmessage)
 	}
 ];
 
@@ -176,7 +181,7 @@ function getADUser(uid) {
 			var opts = {
 				filter: `(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(${config.ldap.uid_attribute}=${uid}))`,
 				scope: 'sub',
-				attributes: ['givenName', 'displayName', config.ldap.uid_attribute]
+				attributes: ['givenName', 'displayName','mail', config.ldap.uid_attribute]
 			};
 
 			client.search(config.ldap.basedn, opts, function(err, res) {
@@ -936,3 +941,44 @@ function searchContacts(query) {
 		console.error(err);
 	});
 }
+
+function sendMVmessage(message, usr) {
+	startTyping(message.chat.id);
+
+	if (message.text === '/mv') {
+		return;
+	}
+	
+	var transporter = nodemailer.createTransport(config.nodemailer_setup);
+
+	var mailOptions = {
+		from: usr.mail,
+		to: config.mv_beauftragter.mail,
+		cc: usr.mail,
+		subject: `Neue MV-Anfrage von ${usr.displayName}`,
+		text: `${usr.displayName} möchte Folgendes auf der MV besprechen:\n`
+			+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n'
+			+`${message.text}\n\nGrüße vom Telegram-Bot!`
+	};
+
+	transporter.verify(function(error, success) {
+		if (error) {
+			console.log(error);
+		}
+	});
+
+	transporter.sendMail(mailOptions, (error, info) => {
+		if (error) {
+			bot.sendMessage({
+				chat_id: message.from.id,
+				text: 'Es gab einen Fehler beim Senden der Nachricht an den MV-Beauftragten!'
+			}).catch(_.noop);
+			console.log(error);
+		} else {
+			bot.sendMessage({
+				chat_id: message.chat.id,
+				text: 'Euer Anliegen wurde erfolgreich an den MV-Beauftragten übermittelt!'
+			}).catch(_.noop);
+		}
+	});
+};
