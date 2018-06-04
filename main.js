@@ -327,10 +327,20 @@ function showDetails(message) {
 				stats.names.push(client.name);
 			}
 		},
-		function(stats) {
-			return `Geräte online: ${stats.users + stats.guests}\n` +
-				`Namen: ${stats.names.join(', ')}`;
-		}
+        function formatter(stats) {
+            let validNames = [];
+            let blockedNamesCount = 0;
+            for (let i in stats.names) {
+                let name = stats.names[i];
+                if (_.contains(config.blacklistedDeviceNames, name)) {
+                    blockedNamesCount++;
+                } else {
+                    validNames.push(name)
+                }
+            }
+            return `Geräte online: ${stats.users + stats.guests - blockedNamesCount}\n` +
+                `Namen: ${validNames.join(', ')}`;
+        }
 	);
 }
 

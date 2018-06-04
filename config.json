@@ -52,5 +52,10 @@
 		"bindpw": "",
 		"uid_attribute": "extensionAttribute1",
 		"basedn": "DC=activedirectory,DC=example,DC=com"
-	}
+	},
+	"blacklistedDeviceNames": [
+		"Smart Mirror",
+		"Drucker",
+		"Chromecast Seminarraum"
+	]
 }
