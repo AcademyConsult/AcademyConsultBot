@@ -82,6 +82,7 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `bindpw`: String - Passwort für Login
   * `uid_attribute`: String - LDAP-Attribut, in dem die Telegram-Benutzer-ID gespeichert ist
   * `basedn`: String - DN auf den die Suche nach Benutzerobjekten eingeschränkt werden soll
+* `blacklistedDeviceNames`: Array - Netzwerkgeräte die nicht angezeigt werden sollen (`/details`)
 
 Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
 des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#10)
