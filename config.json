@@ -52,5 +52,6 @@
 		"bindpw": "",
 		"uid_attribute": "extensionAttribute1",
 		"basedn": "DC=activedirectory,DC=example,DC=com"
-	}
+	},
+	"hidden_network_essid": "hidden network"
 }
