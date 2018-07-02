@@ -318,8 +318,8 @@ function showDetails(message) {
 		'api/s/default/stat/sta',
 		function(client) {
 			var stats = this;
-			if (client.essid === config.hidden_network_essid) {
-				return
+			if (config.excluded_essids.indexOf(client.essid) > -1) {
+				return;
 			}
 			if (client._is_guest_by_uap) {
 				stats.guests++;
