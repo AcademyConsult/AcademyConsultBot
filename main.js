@@ -319,11 +319,7 @@ function showDetails(message) {
 		function(client) {
 			var stats = this;
 			if (config.excluded_essids.indexOf(client.essid) > -1) {
-<<<<<<< HEAD
 				return;
-=======
-				return
->>>>>>> 868940c... Implement excluded_essids
 			}
 			if (client._is_guest_by_uap) {
 				stats.guests++;
