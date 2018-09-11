@@ -53,5 +53,13 @@
 		"uid_attribute": "extensionAttribute1",
 		"basedn": "DC=activedirectory,DC=example,DC=com"
 	},
-	"excluded_essids": ["hidden network"]
+	"excluded_essids": ["hidden network"],
+	"simple_poll": {
+		"title": "Nach Büroschlüssel fragen",
+		"buttons": {
+			"there": "Bin eh da",
+			"nearby": "Bin in der Nähe",
+			"comeby": "Könnte vorbei kommen"
+		}
+	}
 }

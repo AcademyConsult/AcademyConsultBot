@@ -8,7 +8,7 @@ Unterstützte Befehle
 * /countdown: aktiviert Push-Benachrichtigungen für neue Bewerbungen während dem Recruiting
 * /details: zeigt an, wie viele Geräte im Büro-WLAN online sind und die Namen der Benutzer, falls verfügbar
 * /events: zeigt die aktuellen Termine aus dem Event-Kalender an
-* inline query: Suchen und Versenden von Kontakten aus dem internen Adressbuch
+* inline query: Suchen und Versenden von Kontakten aus dem internen Adressbuch; Erstellen einer einfachen Umfrage
 
 ## Details
 ### Authentifizierung
@@ -50,6 +50,17 @@ durchsucht und Treffer als Ergebnisse zur Auswahl angezeigt. Ausgewählte Treffe
 werden als Kontakte inkl. Handynummer (AD-Attribut `mobile`) an den aktuellen
 Chat gesendet.
 
+### Einfach Umfrage
+Wird kein passender Kontakt für ein inline query gefunden, wird der eingegebene
+Text als Text für eine einfache Umfrage interpretiert. Wählt der User dieses
+Ergebnis aus, wird eine Nachricht mit seinem Text in den Chat geschickt mit den
+möglichen Optionen als inline keyboard. Andere User können dann über das inline
+keyboard eine Option auswählen (oder wieder abwählen) wodurch sie mit ihrem
+Namen zur ausgewählten Option in der Nachricht hinzugefügt (oder wieder
+entfernt) werden.
+Die verfügbaren Optionen werden global in der `simple_poll`-Konfiguration
+festgelegt (siehe unten).
+
 ## Ausführung
 Der Bot kann als Docker-Container gebaut und gestartet werden mit einem einfachen
 ```
@@ -83,6 +94,9 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `uid_attribute`: String - LDAP-Attribut, in dem die Telegram-Benutzer-ID gespeichert ist
   * `basedn`: String - DN auf den die Suche nach Benutzerobjekten eingeschränkt werden soll
 * `excluded_essids`: Array - ESSIDs deren verbundene Geräte nicht angezeigt werden sollen (`/details`)
+* `simple_poll`: Object - Konfiguration für einfache Umfragen
+  * `title`: String - Titel der dem User beim inline query als Ergebnis angezeigt werden soll
+  * `buttons`: Object - Auswahlmöglichkeiten des inline keyboards; Keys sind die internen IDs der Optionen, Values der Anzeigetext für die Option
 
 Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
 des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#10)

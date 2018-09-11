@@ -85,6 +85,10 @@ var inline_callbacks = [
 	{
 		pattern: /\/bdsu/,
 		handler: wrapRestrictedCommand(showBDSUEvents)
+	},
+	{
+		pattern: /^\/poll (?<query_id>[^ ]+) (?<type>.+)$/,
+		handler: wrapRestrictedCommand(updateSimplePoll)
 	}
 ];
 
@@ -908,6 +912,9 @@ function searchContacts(query) {
 				var results = _.filter(contacts, function(contact) {
 					return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
 				});
+				if (!results.length) {
+					return getSimplePollResults(query);
+				}
 				if (query.offset) {
 					results = results.splice(query.offset);
 				}
@@ -938,4 +945,87 @@ function searchContacts(query) {
 	}).catch(function(err) {
 		console.error(err);
 	});
+}
+
+let polls = {};
+function getSimplePollReplyMarkup(query_id) {
+	return {
+		inline_keyboard: Object.keys(config.simple_poll.buttons).map(type => {
+			return [{text: config.simple_poll.buttons[type], callback_data: `/poll ${query_id} ${type}`}]
+		})
+	};
+}
+
+function getSimplePollResults(query) {
+	polls[query.id] = {
+		text: query.query,
+		user: query.from,
+		answers: {},
+	};
+	Object.keys(config.simple_poll.buttons).forEach(type => polls[query.id].answers[type] = []);
+	bot.answerInlineQuery({
+		inline_query_id: query.id,
+		results: [{
+			type: 'article',
+			id: query.id,
+			title: config.simple_poll.title,
+			description: query.query,
+			input_message_content: {
+				message_text: query.query,
+			},
+			reply_markup: getSimplePollReplyMarkup(query.id),
+		}],
+		is_personal: 'true',
+		cache_time: 0,
+	}).catch(console.log);
+}
+
+function updateSimplePoll(query, user) {
+	let match = query.data.match(/^\/poll (?<query_id>[^ ]+) (?<type>.+)$/);
+	if (!match || !polls[match.groups.query_id]) {
+		bot.answerCallbackQuery({
+			callback_query_id: query.id,
+			text: 'Anfrage nicht mehr gefunden',
+		}).catch(_.noop);
+		return;
+	}
+
+	let inlineQuery = polls[match.groups.query_id];
+	let text = inlineQuery.text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+
+	Object.keys(inlineQuery.answers).forEach(type => {
+		let existing = inlineQuery.answers[type].find(user => user.id == query.from.id);
+		if (existing) {
+			let index = inlineQuery.answers[type].indexOf(existing);
+			inlineQuery.answers[type].splice(index, 1);
+		} else if (type == match.groups.type) {
+			inlineQuery.answers[type].push({first_name: user.givenName, id: query.from.id});
+		}
+	});
+
+	let answerTexts = Object.keys(config.simple_poll.buttons).map(type => {
+		if (inlineQuery.answers[type].length) {
+			return `${config.simple_poll.buttons[type]}: ` + inlineQuery.answers[type].map(user => {
+				return `<a href="tg://user?id=${user.id}">${user.first_name}</a>`;
+			}).join(', ');
+		}
+	}).filter(answer => answer);
+
+	if (answerTexts.length) {
+		text = `${text}\n--\n${answerTexts.join("\n")}`;
+	}
+
+	bot.editMessageText({
+		inline_message_id: query.inline_message_id,
+		parse_mode: 'HTML',
+		text: text,
+		reply_markup: JSON.stringify(getSimplePollReplyMarkup(match.groups.query_id)),
+	}).catch(_.noop);
+	bot.answerCallbackQuery({
+		callback_query_id: query.id,
+	}).catch(_.noop);
 }
