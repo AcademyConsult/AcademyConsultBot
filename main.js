@@ -852,7 +852,7 @@ function fetchContacts(save, reject) {
 		var opts = {
 			filter: '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(mobile=*))',
 			scope: 'sub',
-			attributes: ['givenName', 'sn', 'displayName', 'name', 'mobile']
+			attributes: ['givenName', 'sn', 'displayName', 'name', 'mobile', 'mail']
 		};
 
 		client.search(config.ldap.basedn, opts, function(err, res) {
@@ -928,7 +928,15 @@ function searchContacts(query) {
 						id: contact.name,
 						phone_number: contact.mobile,
 						first_name: contact.givenName,
-						last_name: contact.sn
+						last_name: contact.sn,
+						vcard: `BEGIN:VCARD
+							VERSION:2.1
+							N:${contact.sn};${contact.givenName};;;
+							FN:${contact.displayName}
+							TEL;CELL:${contact.mobile}
+							EMAIL;WORK:${contact.mail}
+							ORG:Academy Consult
+							END:VCARD`.replace(/\n\t+/g, "\n")
 					}
 				});
 				bot.answerInlineQuery({
