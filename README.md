@@ -3,7 +3,7 @@ Dies ist der Quellcode für den [Telegram](https://telegram.org/)-Bot von Academ
 
 Unterstützte Befehle
 * /bewerbungen: zeigt die Anzahl der aktuellen Bewerbungen während dem Recruiting an
-* /bdsu: zeigt BDSU-Events an, die im Eventkalender stehen
+* /bdsu: zeigt BDSU-/Netzwerk-Events an, die im Eventkalender stehen
 * /buero: zeigt die aktuellen Reservierungen/Verfügbarkeiten der Büroräume an
 * /countdown: aktiviert Push-Benachrichtigungen für neue Bewerbungen während dem Recruiting
 * /details: zeigt an, wie viele Geräte im Büro-WLAN online sind und die Namen der Benutzer, falls verfügbar

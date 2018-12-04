@@ -641,7 +641,7 @@ function showBDSUEvents(query) {
 	var events = cache.get('calendars.bdsu', function(store, reject) {
 		return loadCalendar('calendars.events', config.events.ical).then(function(data) {
 			let events = _(data).filter(function(event) {
-				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)
+				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress|JADE|CCT/i)
 			});
 			store(events, 120000);
 		}).catch(reject);
