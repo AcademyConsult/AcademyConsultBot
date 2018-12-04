@@ -638,23 +638,10 @@ function showEvents(query) {
 }
 
 function showBDSUEvents(query) {
-	var calendars = cache.get('calendars.bdsu', function(store, reject) {
-		var promises = [];
-
-		_.each(config.bdsu, function(calendar, index) {
-			promises.push(loadCalendar(`calendars.bdsu.${index}`, calendar));
-		});
-
-		promises.push(loadCalendar('calendars.events', config.events.ical).then(function(data) {
-			return _(data).filter(function(event) {
+	var events = cache.get('calendars.bdsu', function(store, reject) {
+		return loadCalendar('calendars.events', config.events.ical).then(function(data) {
+			let events = _(data).filter(function(event) {
 				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress/i)
-			});
-		}));
-
-		Promise.all(promises).then(function(calendars) {
-			var events = {};
-			_.each(calendars, function(calendar_events) {
-				_(events).extend(calendar_events);
 			});
 			store(events, 120000);
 		}).catch(reject);
@@ -663,7 +650,7 @@ function showBDSUEvents(query) {
 	_renderPaginatedCalendar(
 		query,
 		'bdsu',
-		calendars,
+		events,
 		"Aktuelle BDSU-Treffen:\n",
 		function(dateString, timeString, event) {
 			return `${dateString}: [${event.summary}${event.location ? ` (${event.location})` : ''}](${event.url})${timeString}`;

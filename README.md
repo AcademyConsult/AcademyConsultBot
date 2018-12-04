@@ -3,7 +3,7 @@ Dies ist der Quellcode für den [Telegram](https://telegram.org/)-Bot von Academ
 
 Unterstützte Befehle
 * /bewerbungen: zeigt die Anzahl der aktuellen Bewerbungen während dem Recruiting an
-* /bdsu: zeigt BDSU-Events an, die im Eventkalender oder in den BDSU-Kalendern stehen
+* /bdsu: zeigt BDSU-Events an, die im Eventkalender stehen
 * /buero: zeigt die aktuellen Reservierungen/Verfügbarkeiten der Büroräume an
 * /countdown: aktiviert Push-Benachrichtigungen für neue Bewerbungen während dem Recruiting
 * /details: zeigt an, wie viele Geräte im Büro-WLAN online sind und die Namen der Benutzer, falls verfügbar
@@ -81,7 +81,6 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.js#310) werden soll
   * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.js#233) können
 * `events` - Object - `ical` und `html` URLs für den Eventkalender (`/events`)
-* `bdsu`: Array - iCal-URLs für BDSU-Events (`/bdsu`)
 * `rooms`: Object - `ical` und `html` URLs für alle Raumkalender mit Raumnamen als Keys (`/buero`)
 * `countdown`: Object - URL zum API-Endpunkt zum Abfragen der Bewerberzahlen (`/bewerbungen`, `/countdown`)
 * `group`: Object - Vereinsgruppe, zu der alle neuen Mitglieder automatisch eingeladen werden sollen
