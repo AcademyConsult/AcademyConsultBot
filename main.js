@@ -498,15 +498,22 @@ function filterEvents(events, count, after, before) {
 		before = !ascending ? before : _.max(results, function(event) {return event.end  }).end;
 	}
 
+	let event_ids = results.map(event => `${event.uid}-${event.start}`);
 	_.each(events, function(event) {
 		if (event.rrule) {
 			_.each(event.rrule.between(after, before), function(newstart) {
 				if (newstart.getTime() != event.start.getTime()) {
-					results.push({
-						summary: event.summary,
-						start: newstart,
-						end: new Date(event.end.getTime() + (newstart - event.start))
-					});
+					let event_id = `${event.uid}-${newstart}`;
+					// only add events by rrule if it is not already included as
+					// its own instance
+					if (event_ids.indexOf(event_id) === -1) {
+						event_ids.push(event_id);
+						results.push({
+							summary: event.summary,
+							start: newstart,
+							end: new Date(event.end.getTime() + (newstart - event.start))
+						});
+					}
 				}
 			});
 		}
