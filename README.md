@@ -15,7 +15,7 @@ Unterstützte Befehle
 Die Funktionen des Bots stehen nur Mitgliedern von Academy Consult München e.V.
 zur Verfügung. Zur Authentifizierung muss die Telegram User-ID bei einem aktiven
 Benutzer im internen Active Directory hinterlegt sein (in einem
-[`extensionAttribute`](config.json#L48)-Attribut).
+[`extensionAttribute`](config.json#L49)-Attribut).
 
 Beim ersten Kontakt sucht der Bot nach einem aktiven AD-Benutzer mit der
 Telegram-ID im entsprechenden Attribut. Wird kein aktiver AD-Benutzer gefunden,
@@ -40,7 +40,7 @@ entsprechende Seite aufgerufen wird. Der dort eingegebene Anzeigename wird dann
 mit der MAC-Adresse des Gerätes verknüpft und im UniFi-Controller gespeichert.
 
 Zusätzlich werden alle Benachrichtigungen aus dem UniFi-Controller regelmäßig
-abgerufen und an alle [`subscribers`](config.json#L10) (die IT-Telegram-Gruppe
+abgerufen und an alle [`subscribers`](config.json#L11) (die IT-Telegram-Gruppe
 von Academy Consult) geschickt, um z.B. sofort über abgesteckte Access Points zu
 informieren.
 
@@ -78,8 +78,8 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `uri`: String - Basis-URL, unter der der Controller erreichbar ist
   * `username`: String - Benutzername für API-Login
   * `password`: String - Passwort für API-Login
-  * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.js#310) werden soll
-  * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.js#233) können
+  * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.js#L381) werden soll
+  * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.js#L359) können
 * `events` - Object - `ical` und `html` URLs für den Eventkalender (`/events`)
 * `rooms`: Object - `ical` und `html` URLs für alle Raumkalender mit Raumnamen als Keys (`/buero`)
 * `countdown`: Object - URL zum API-Endpunkt zum Abfragen der Bewerberzahlen (`/bewerbungen`, `/countdown`)
@@ -98,7 +98,7 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `buttons`: Object - Auswahlmöglichkeiten des inline keyboards; Keys sind die internen IDs der Optionen, Values der Anzeigetext für die Option
 
 Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
-des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#10)
+des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#L10)
 benötigt.
 
 ### Entwicklung
