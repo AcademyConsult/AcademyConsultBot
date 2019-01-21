@@ -5,9 +5,9 @@
   "main": "main.js",
   "dependencies": {
     "ical": "^0.5.0",
-    "ldapjs": "^1.0.1",
-    "telegram-bot-api": "^1.2.0",
-    "underscore": "^1.8.3"
+    "ldapjs": "^1.0.2",
+    "telegram-bot-api": "^1.3.1",
+    "underscore": "^1.9.1"
   },
   "devDependencies": {},
   "scripts": {
