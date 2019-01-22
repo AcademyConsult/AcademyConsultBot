@@ -1,9 +1,9 @@
 var telegram = require('telegram-bot-api');
-var unifi    = require('./unifi.js');
+var unifi    = require('./unifi');
 var https    = require('https');
 var ical     = require('node-ical');
 var _        = require('underscore')._;
-var Cache    = require('./cache');
+var newCache = require('./cache');
 var ldap     = require('ldapjs');
 var fs       = require('fs');
 
@@ -14,7 +14,7 @@ process.env.TZ = 'UTC';
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
 var config = require('./config.json');
-var cache  = new Cache();
+var cache  = newCache();
 
 var bot = new telegram({
 	token: config.token,
@@ -25,7 +25,7 @@ var bot = new telegram({
 });
 
 var controllers = [];
-for (i = 0; i < config.controllers.length; i++) {
+for (let i = 0; i < config.controllers.length; i++) {
 	var controller = config.controllers[i];
 	controllers.push(new unifi(
 		controller.uri,
@@ -473,14 +473,14 @@ function addLeading0s(string) {
 	return string.replace(/(^|\D)(?=\d(?!\d))/g, '$10');
 }
 
-function getShortDateString(date, is_end) {
+function getShortDateString(date, is_end?) {
 	if (is_end) {
 		date = new Date(date - 1);
 	}
 	return addLeading0s([date.getDate(), (date.getMonth()+1), ''].join('.'));
 }
 
-function getShortTimeString(date, is_end) {
+function getShortTimeString(date, is_end?) {
 	var time = addLeading0s([date.getHours(), date.getMinutes()].join(':'));
 	if (is_end && time == '00:00') {
 		time = '24:00';
@@ -488,7 +488,7 @@ function getShortTimeString(date, is_end) {
 	return time;
 }
 
-function filterEvents(events, count, after, before) {
+function filterEvents(events, count, after, before?) {
 	after = new Date(after);
 	before = new Date(before);
 
@@ -541,7 +541,7 @@ function filterEvents(events, count, after, before) {
 	return count ? results.splice(ascending ? 0 : -count, count) : results;
 }
 
-function loadCalendar(cache_key, url, ttl) {
+function loadCalendar(cache_key, url, ttl?) {
 	ttl = ttl || 120000;
 	return cache.get(cache_key, function(store, reject) {
 		ical.fromURL(url, {}, function(err, data) {
@@ -556,6 +556,7 @@ function loadCalendar(cache_key, url, ttl) {
 
 function _renderPaginatedCalendar(query, command, calendar_promise, header, line_renderer) {
 	var after, before;
+	var message;
 	if (query.data) {
 		var parts = query.data.match(new RegExp(`\/${command}(?: after:([0-9]+))?(?: before:([0-9]+))?`));
 		after = Number.parseInt(parts[1]);
@@ -682,7 +683,7 @@ function showReservations(query) {
 
 	var promises = [];
 
-	var now = new Date();
+	var now = Date.now();
 	_.each(config.rooms, function(urls, room) {
 		promises.push(loadCalendar(`calendars.${room}`, urls.ical).then(function(data) {
 			var reservations = filterEvents(data, 0, now);

@@ -22,7 +22,7 @@ function Unifi(base_url, username, password, site) {
 			path: `${base_path}api/login`
 		});
 		return _doRequest(options, {username, password})
-			.then(function(response) {
+			.then(function(response: any) {
 				var {result, data} = response;
 				if (result.headers['set-cookie']) {
 					var options = _.extend({}, defaults, {
@@ -32,7 +32,7 @@ function Unifi(base_url, username, password, site) {
 						}
 					});
 					return _doRequest(options, params)
-						.then(function (response) {
+						.then(function (response: any) {
 							var {result, data} = response;
 							try {
 								data = JSON.parse(data);

@@ -11,6 +11,6 @@ USER node
 COPY package.json package-lock.json /app/
 RUN npm install --production
 
-COPY main.js unifi.js cache.js activedirectory_CA.pem /app/
+COPY main.ts unifi.ts cache.ts tsconfig.json activedirectory_CA.pem /app/
 
 CMD ["npm", "start"]

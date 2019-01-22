@@ -78,8 +78,8 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `uri`: String - Basis-URL, unter der der Controller erreichbar ist
   * `username`: String - Benutzername für API-Login
   * `password`: String - Passwort für API-Login
-  * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.js#L381) werden soll
-  * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.js#L359) können
+  * `subscribers`: Array - Telegram-IDs von Benutzern/Gruppen, an die ein [Alarm aus dem Controller geschickt](main.ts#L386) werden soll
+  * `whitelist`: Array - Telegram-IDs von Benutzern/Gruppen, die [erweiterte Controller-Informationen abfragen](main.ts#L364) können
 * `events` - Object - `ical` und `html` URLs für den Eventkalender (`/events`)
 * `rooms`: Object - `ical` und `html` URLs für alle Raumkalender mit Raumnamen als Keys (`/buero`)
 * `countdown`: Object - URL zum API-Endpunkt zum Abfragen der Bewerberzahlen (`/bewerbungen`, `/countdown`)
@@ -98,7 +98,7 @@ Alle benötigte Konfiguration wird in der [`config.json`](config.json) vorgenomm
   * `buttons`: Object - Auswahlmöglichkeiten des inline keyboards; Keys sind die internen IDs der Optionen, Values der Anzeigetext für die Option
 
 Für eine sichere LDAP-Verbindung über `ldaps` wird außerdem das CA-Zertifikat
-des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.js#L10)
+des LDAP-/AD-Servers in der Datei [`activedirectory_CA.pem`](main.ts#L15)
 benötigt.
 
 ### Entwicklung
@@ -108,7 +108,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 gestartet werden. Dadurch wird das komplette Verzeichnis unter `/app` in den
 Container gemountet, sodass alle Dateiänderungen auch ohne neuen `docker build`
-sofort sichtbar sind und durch `node-dev` direkt ausgeführt werden sowie der
+sofort sichtbar sind und durch `ts-node-dev` direkt ausgeführt werden sowie der
 [node inspector](https://nodejs.org/en/docs/inspector/) gestartet, sodass man in
 Chrome über `chrome://inspect` den laufenden Bot mit den DevTools öffnen und live
 debuggen kann.
