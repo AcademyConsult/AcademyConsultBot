@@ -108,8 +108,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 gestartet werden. Dadurch wird das komplette Verzeichnis unter `/app` in den
 Container gemountet, sodass alle Dateiänderungen auch ohne neuen `docker build`
-beim nächsten Start sofort effektiv sind und der
+sofort sichtbar sind und durch `node-dev` direkt ausgeführt werden sowie der
 [node inspector](https://nodejs.org/en/docs/inspector/) gestartet, sodass man in
-Chrome über `chrome://inspect` bzw. die ausgebene `chrome-devtools://...` URL
-(IP in der URL austauschen!) den laufenden Bot mit den DevTools öffnen und live
+Chrome über `chrome://inspect` den laufenden Bot mit den DevTools öffnen und live
 debuggen kann.

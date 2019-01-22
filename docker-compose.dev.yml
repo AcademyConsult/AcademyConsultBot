@@ -3,4 +3,4 @@ bot:
     - ./:/app/:rw
   ports:
     - "9229:9229"
-  command: sh -c 'npm install && node --inspect=0.0.0.0:9229 main.js'
+  command: sh -c 'npm install && npx node-dev --inspect=0.0.0.0:9229 main.js'
