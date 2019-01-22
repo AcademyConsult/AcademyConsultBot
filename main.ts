@@ -14,7 +14,7 @@ import config    from './config.json';
 process.env.TZ = 'UTC';
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
-var cache  = Cache();
+var cache  = new Cache();
 
 var bot = new telegram({
 	token: config.token,
