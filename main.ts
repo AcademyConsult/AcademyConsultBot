@@ -6,6 +6,7 @@ import { _ }     from 'underscore';
 import { Cache } from './cache';
 import ldap      from 'ldapjs';
 import fs        from 'fs';
+import config    from './config.json';
 
 // force local timezone to be UTC
 // rrule is quite buggy when the system time is not UTC,
@@ -13,7 +14,6 @@ import fs        from 'fs';
 process.env.TZ = 'UTC';
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
-var config = require('./config.json');
 var cache  = Cache();
 
 var bot = new telegram({
@@ -26,7 +26,7 @@ var bot = new telegram({
 
 var controllers = [];
 for (let i = 0; i < config.controllers.length; i++) {
-	var controller = config.controllers[i];
+	var controller: {uri: string, username: string, password: string, site?: string} = config.controllers[i];
 	controllers.push(new Unifi(
 		controller.uri,
 		controller.username,
