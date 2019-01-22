@@ -1,7 +1,12 @@
-bot:
-  build: .
-  volumes:
-    - /etc/localtime:/etc/localtime:ro
-    - ./config.json:/app/config.json:ro
-  user: www-data
-  restart: always
+version: '2.1'
+services:
+  bot:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config.json:/app/config.json:ro
+    restart: always
