@@ -1,11 +1,16 @@
 var telegram = require('telegram-bot-api');
 var unifi    = require('./unifi.js');
 var https    = require('https');
-var ical     = require('ical');
+var ical     = require('node-ical');
 var _        = require('underscore')._;
 var Cache    = require('./cache');
 var ldap     = require('ldapjs');
 var fs       = require('fs');
+
+// force local timezone to be UTC
+// rrule is quite buggy when the system time is not UTC,
+// e.g. time shifts around switch to/from DST
+process.env.TZ = 'UTC';
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
 var config = require('./config.json');
@@ -491,6 +496,14 @@ function filterEvents(events, count, after, before) {
 		return event.end > after || event.start < before;
 	});
 
+	_.filter(events, event => event.recurrences).forEach(event => {
+		_.each(event.recurrences, recurrence => {
+			if (recurrence.end > after || recurrence.start < before) {
+				results.push(recurrence);
+			}
+		});
+	});
+
 	var ascending = !before.getTime();
 	if (count && results.length >= count) {
 		results = _.sortBy(results, 'start').splice(ascending ? 0 : -count, count);
@@ -498,16 +511,21 @@ function filterEvents(events, count, after, before) {
 		before = !ascending ? before : _.max(results, function(event) {return event.end  }).end;
 	}
 
-	let event_ids = results.map(event => `${event.uid}-${event.start}`);
 	_.each(events, function(event) {
 		if (event.rrule) {
-			_.each(event.rrule.between(after, before), function(newstart) {
+			let recurrences;
+			if (after.getTime() && before.getTime()) {
+				recurrences = event.rrule.between(after, before);
+			} else if (after.getTime()) {
+				recurrences = event.rrule.after(after);
+			} else {
+				recurrences = event.rrule.before(before);
+			}
+			_.each(recurrences, function(newstart) {
 				if (newstart.getTime() != event.start.getTime()) {
-					let event_id = `${event.uid}-${newstart}`;
 					// only add events by rrule if it is not already included as
 					// its own instance
-					if (event_ids.indexOf(event_id) === -1) {
-						event_ids.push(event_id);
+					if (!event.recurrences || !event.recurrences[newstart.toISOString()]) {
 						results.push({
 							summary: event.summary,
 							start: newstart,

@@ -4,8 +4,9 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "ical": "^0.5.0",
     "ldapjs": "^1.0.2",
+    "node-ical": "^0.9.0",
+    "request": "^2.88.0",
     "telegram-bot-api": "github:AcademyConsult/telegram-bot-api",
     "underscore": "^1.9.1"
   },
