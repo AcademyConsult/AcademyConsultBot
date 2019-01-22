@@ -1,11 +1,11 @@
-var telegram = require('telegram-bot-api');
-var unifi    = require('./unifi');
-var https    = require('https');
-var ical     = require('node-ical');
-var _        = require('underscore')._;
-var newCache = require('./cache');
-var ldap     = require('ldapjs');
-var fs       = require('fs');
+import telegram  from 'telegram-bot-api';
+import { Unifi } from './unifi';
+import https     from 'https';
+import ical      from 'node-ical';
+import { _ }     from 'underscore';
+import { Cache } from './cache';
+import ldap      from 'ldapjs';
+import fs        from 'fs';
 
 // force local timezone to be UTC
 // rrule is quite buggy when the system time is not UTC,
@@ -14,7 +14,7 @@ process.env.TZ = 'UTC';
 
 var ca     = fs.readFileSync('activedirectory_CA.pem');
 var config = require('./config.json');
-var cache  = newCache();
+var cache  = Cache();
 
 var bot = new telegram({
 	token: config.token,
@@ -27,7 +27,7 @@ var bot = new telegram({
 var controllers = [];
 for (let i = 0; i < config.controllers.length; i++) {
 	var controller = config.controllers[i];
-	controllers.push(new unifi(
+	controllers.push(new Unifi(
 		controller.uri,
 		controller.username,
 		controller.password,

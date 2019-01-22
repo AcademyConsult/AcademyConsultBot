@@ -1,6 +1,4 @@
-module.exports = Cache;
-
-function Cache() {
+export function Cache() {
 	var data = {};
 
 	function get(key, getter) {

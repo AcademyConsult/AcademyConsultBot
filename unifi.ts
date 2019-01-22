@@ -1,11 +1,8 @@
-module.exports = Unifi;
+import { _ } from 'underscore';
+import url from 'url';
+import https from 'https';
 
-var _           = require('underscore')._;
-var url         = require('url');
-var https       = require('https');
-var querystring = require('querystring');
-
-function Unifi(base_url, username, password, site) {
+export function Unifi(base_url, username, password, site) {
 	var cookie;
 	var parts     = url.parse(base_url);
 	var base_path = parts.pathname;
