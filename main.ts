@@ -2,7 +2,6 @@ import telegram  from 'telegram-bot-api';
 import { Unifi } from './unifi';
 import https     from 'https';
 import ical      from 'node-ical';
-import { _ }     from 'underscore';
 import { Cache } from './cache';
 import ldap      from 'ldapjs';
 import fs        from 'fs';
@@ -117,7 +116,7 @@ bot.on('message', function(message) {
 
 bot.on('inline.callback.query', function(query) {
 	if (query && query.data) {
-		_.each(inline_callbacks, function(command) {
+		inline_callbacks.forEach(function(command) {
 			if (query.data.match(command.pattern)) {
 				command.handler(query);
 			}
@@ -134,12 +133,12 @@ function wrapRestrictedCommand(command) {
 				bot.answerCallbackQuery({
 					callback_query_id: query.id,
 					text: 'Fehler beim Laden der Benutzerdaten'
-				}).catch(_.noop);
+				}).catch(() => {});
 			} else {
 				bot.sendMessage({
 					chat_id: query.chat.id,
 					text: 'Fehler beim Laden der Benutzerdaten',
-				}).catch(_.noop);
+				}).catch(() => {});
 			}
 			return Promise.reject(error);
 		}).then(function(user) {
@@ -159,7 +158,7 @@ function wrapRestrictedCommand(command) {
 					chat_id: message.chat.id,
 					parse_mode: parse_mode,
 					text: text
-				}).catch(_.noop);
+				}).catch(() => {});
 			}
 		}).catch(function(error) {
 			console.error(error);
@@ -224,7 +223,7 @@ function startTyping(chat_id) {
 	bot.sendChatAction({
 		chat_id: chat_id,
 		action: 'typing'
-	}).catch(_.noop);
+	}).catch(() => {});
 }
 
 function inviteUserToGroup(user_id, group_id, group_name) {
@@ -237,7 +236,7 @@ function inviteUserToGroup(user_id, group_id, group_name) {
 			chat_id: user_id,
 			parse_mode: 'Markdown',
 			text: `Tippe hier, um [der "${group_name}"-Gruppe beizutreten](${inviteLink}).`
-		}).catch(_.noop);
+		}).catch(() => {});
 	}).catch(function(error) {
 		console.error(error);
 	});
@@ -248,7 +247,7 @@ function runStart(message, user) {
 		bot.sendMessage({
 			chat_id: message.from.id,
 			text: `Hallo ${user.givenName}! Was kann ich für dich tun?`
-		}).catch(_.noop);
+		}).catch(() => {});
 
 		var _inviteUser = function() {
 			inviteUserToGroup(message.from.id, config.group.id, config.group.name);
@@ -269,7 +268,7 @@ function runStart(message, user) {
 }
 
 function verifyNewChatMembers(message) {
-	var promises = _(message.new_chat_members).map(function(member) {
+	var promises = (<any[]>message.new_chat_members).map(function(member) {
 		return getADUser(member.id).then(function(user) {
 			return {user, member};
 		}).catch(function(err) {
@@ -278,13 +277,13 @@ function verifyNewChatMembers(message) {
 		});
 	});
 	Promise.all(promises).then(function(users) {
-		_.chain(users).filter(function(user) {
+		users.filter(function(user) {
 			return !user.user;
-		}).each(function(user) {
+		}).forEach(function(user) {
 			bot.kickChatMember({
 				chat_id: message.chat.id,
 				user_id: user.member.id
-			}).catch(_.noop);
+			}).catch(() => {});
 		});
 	}).catch(function(err) {
 		console.error(err);
@@ -292,7 +291,7 @@ function verifyNewChatMembers(message) {
 }
 
 function _showControllerInfos(message, endpoint, parser, formatter) {
-	_.each(controllers, function(controller, i) {
+	controllers.forEach(function(controller, i) {
 		startTyping(message.chat.id);
 		controller.ApiCall(endpoint).then(function(data) {
 			var stats = {
@@ -302,21 +301,26 @@ function _showControllerInfos(message, endpoint, parser, formatter) {
 				inactive: 0,
 				names: []
 			}
-			_.each(data, parser, stats);
+			data.forEach(parser, stats);
 
-			stats.names = _.uniq(_.sortBy(stats.names, function(name) {return name}), true);
+			stats.names = stats.names.sort((a, b) => a < b ? -1 : 1).reduce((values, value) => {
+				if (values.indexOf(value) === -1) {
+					values.push(value);
+				}
+				return values;
+			}, []);
 
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
 				text: formatter(stats, controller, i)
-			}).catch(_.noop);
+			}).catch(() => {});
 		}).catch(function(msg) {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				reply_to_message_id: message.message_id,
 				text: `Controller nicht erreichbar "${config.controllers[i].name}": ${msg}`
-			}).catch(_.noop);
+			}).catch(() => {});
 		});
 	});
 }
@@ -372,7 +376,7 @@ function showStatus(message) {
 	);
 }
 
-_.each(controllers, function(controller, i) {
+controllers.forEach(function(controller, i) {
 	if (config.controllers[i].subscribers && config.controllers[i].subscribers.length) {
 		setInterval(controller.handleAlarms, 10000, function(alarm) {
 				if (alarm.msg) {
@@ -383,15 +387,15 @@ _.each(controllers, function(controller, i) {
 					var ts = new Date(alarm.time);
 					var timestring = `${ts.getDate()}.${ts.getMonth() + 1}.${ts.getFullYear()} ${ts.toLocaleTimeString()}`;
 					var text = `New alert on "${config.controllers[i].name}" at ${timestring}:\n${msg}`;
-					_.each(config.controllers[i].subscribers, function(subscriber) {
+					config.controllers[i].subscribers.forEach(function(subscriber) {
 						bot.sendSticker({
 							chat_id: subscriber,
 							sticker: "BQADAgADJwwAAkKvaQABUq7QF_-jeCkC" // bee doo bee doo
-						}).catch(_.noop);
+						}).catch(() => {});
 						bot.sendMessage({
 							chat_id: subscriber,
 							text: text
-						}).catch(_.noop);
+						}).catch(() => {});
 					});
 					return true;
 				}
@@ -405,7 +409,7 @@ function _sendCountdown(chat_id) {
 	bot.sendMessage({
 		chat_id: chat_id,
 		text: `Aktuelle Anzahl Bewerbungen: ${countdown}`
-	}).catch(_.noop);
+	}).catch(() => {});
 }
 
 setInterval(_updateCountdown, 30000);
@@ -431,7 +435,7 @@ function _updateCountdown(callback) {
 				changed = countdown != data.count;
 				countdown = data.count;
 				if (changed) {
-					_.each(subscribers, _sendCountdown);
+					subscribers.forEach(_sendCountdown);
 				}
 			} catch (error) {
 				console.error(error);
@@ -459,13 +463,13 @@ function subscribe(message) {
 		bot.sendMessage({
 			chat_id: message.chat.id,
 			text: 'Du erhälst jetzt automatische Updates, wenn neue Bewerbungen rein kommen',
-		}).catch(_.noop);
+		}).catch(() => {});
 	} else {
 		subscribers.splice(index, 1);
 		bot.sendMessage({
 			chat_id: message.chat.id,
 			text: 'Automatische Updates deaktiviert',
-		}).catch(_.noop);
+		}).catch(() => {});
 	}
 }
 
@@ -488,16 +492,18 @@ function getShortTimeString(date, is_end?) {
 	return time;
 }
 
-function filterEvents(events, count, after, before?) {
+function filterEvents(cal_events, count, after, before?) {
 	after = new Date(after);
 	before = new Date(before);
 
-	var results = _.filter(events, function(event) {
+	let events: any[] = Object.values(cal_events);
+
+	var results = events.filter(function(event) {
 		return event.end > after || event.start < before;
 	});
 
-	_.filter(events, event => event.recurrences).forEach(event => {
-		_.each(event.recurrences, recurrence => {
+	events.filter(event => event.recurrences).forEach(event => {
+		Object.values(event.recurrences).forEach((recurrence: any) => {
 			if (recurrence.end > after || recurrence.start < before) {
 				results.push(recurrence);
 			}
@@ -506,12 +512,12 @@ function filterEvents(events, count, after, before?) {
 
 	var ascending = !before.getTime();
 	if (count && results.length >= count) {
-		results = _.sortBy(results, 'start').splice(ascending ? 0 : -count, count);
-		after  =  ascending ? after  : _.min(results, function(event) {return event.start}).start;
-		before = !ascending ? before : _.max(results, function(event) {return event.end  }).end;
+		results = results.sort((a, b) => a.start < b.start ? -1 : 1).splice(ascending ? 0 : -count, count);
+		after  =  ascending ? after  : results.map(result => result.start).reduce((min, start) => start < min ? start : min);
+		before = !ascending ? before : results.map(result => result.end).reduce((max, end) => end > max ? end : max);
 	}
 
-	_.each(events, function(event) {
+	events.forEach(function(event) {
 		if (event.rrule) {
 			let recurrences;
 			if (after.getTime() && before.getTime()) {
@@ -521,23 +527,26 @@ function filterEvents(events, count, after, before?) {
 			} else {
 				recurrences = event.rrule.before(before);
 			}
-			_.each(recurrences, function(newstart) {
-				if (newstart.getTime() != event.start.getTime()) {
-					// only add events by rrule if it is not already included as
-					// its own instance
-					if (!event.recurrences || !event.recurrences[newstart.toISOString()]) {
-						results.push({
-							summary: event.summary,
-							start: newstart,
-							end: new Date(event.end.getTime() + (newstart - event.start))
-						});
+
+			if (recurrences) {
+				[].concat(recurrences).forEach(function(newstart) {
+					if (newstart.getTime() != event.start.getTime()) {
+						// only add events by rrule if it is not already included as
+						// its own instance
+						if (!event.recurrences || !event.recurrences[newstart.toISOString()]) {
+							results.push({
+								summary: event.summary,
+								start: newstart,
+								end: new Date(event.end.getTime() + (newstart - event.start))
+							});
+						}
 					}
-				}
-			});
+				});
+			}
 		}
 	});
 
-	results = _.sortBy(results, 'start');
+	results = results.sort((a, b) => a.start < b.start ? -1 : 1);
 	return count ? results.splice(ascending ? 0 : -count, count) : results;
 }
 
@@ -587,7 +596,7 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 			}
 
 			var lines = [];
-			_.each(events, function(event) {
+			events.forEach(function(event) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
 				if (event.end - event.start > 86400000) { // more than 24h
@@ -600,9 +609,9 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 
 			markup = JSON.stringify({
 				inline_keyboard: [[
-					{text: '<< früher', callback_data: `/${command} before:` + _.min(events, function(event) {return event.start}).start.getTime()},
+					{text: '<< früher', callback_data: `/${command} before:` + events.map(event => event.start.getTime()).reduce((min, start) => start < min ? start : min)},
 					{text: 'jetzt', callback_data: `/${command}`},
-					{text: 'später >>', callback_data: `/${command} after:` + _.max(events, function(event) {return event.start}).start.getTime()}
+					{text: 'später >>', callback_data: `/${command} after:` + events.map(event => event.start.getTime()).reduce((max, start) => start > max ? start : max)}
 				]]
 			});
 			text += lines.join("\n");
@@ -627,17 +636,17 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 				reply_markup: markup,
 				parse_mode: 'Markdown',
 				text: text
-			}).catch(_.noop);
+			}).catch(() => {});
 			bot.answerCallbackQuery({
 				callback_query_id: query.id
-			}).catch(_.noop);
+			}).catch(() => {});
 		} else {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				parse_mode: 'Markdown',
 				text: text,
 				reply_markup: markup
-			}).catch(_.noop);
+			}).catch(() => {});
 		}
 	}).catch(function(err) {
 		console.error(err);
@@ -659,7 +668,7 @@ function showEvents(query) {
 function showBDSUEvents(query) {
 	var events = cache.get('calendars.bdsu', function(store, reject) {
 		return loadCalendar('calendars.events', config.events.ical).then(function(data) {
-			let events = _(data).filter(function(event) {
+			let events = Object.values(data).filter(function(event) {
 				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress|JADE|CCT/i)
 			});
 			store(events, 120000);
@@ -684,7 +693,8 @@ function showReservations(query) {
 	var promises = [];
 
 	var now = Date.now();
-	_.each(config.rooms, function(urls, room) {
+	Object.keys(config.rooms).forEach(room => {
+		let urls = config.rooms[room];
 		promises.push(loadCalendar(`calendars.${room}`, urls.ical).then(function(data) {
 			var reservations = filterEvents(data, 0, now);
 			var line = '';
@@ -700,7 +710,12 @@ function showReservations(query) {
 					}
 					line = 'belegt bis '
 						+ (reservation.end - now > 86400000 ? getShortDateString(reservation.end, true) + ', ' : '')
-						+ getShortTimeString(reservation.end, true) + ' Uhr von ' + _.uniq(users).join(', ');
+						+ getShortTimeString(reservation.end, true) + ' Uhr von ' + users.reduce((values, value) => {
+							if (values.indexOf(value) === -1) {
+								values.push(value);
+							}
+							return values;
+						}, []).join(', ');
 				} else {
 					line = 'frei bis '
 						+ (reservation.start - now > 86400000 ? getShortDateString(reservation.start) + ', ' : '')
@@ -719,11 +734,12 @@ function showReservations(query) {
 		var rooms = [];
 		var markup = {inline_keyboard: []};
 
-		_.each(results, function(result) {
+		results.forEach(function(result) {
 			lines[result.room] = result.line;
 		});
 
-		_.each(config.rooms, function(urls, room) {
+		Object.keys(config.rooms).forEach(room => {
+			let urls = config.rooms[room];
 			rooms.push(`[${room}](${urls.html}): ${lines[room]}`);
 			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
 		});
@@ -735,17 +751,17 @@ function showReservations(query) {
 				parse_mode: 'Markdown',
 				text: rooms.join("\n"),
 				reply_markup: JSON.stringify(markup)
-			}).catch(_.noop);
+			}).catch(() => {});
 			bot.answerCallbackQuery({
 				callback_query_id: query.id
-			}).catch(_.noop);
+			}).catch(() => {});
 		} else {
 			bot.sendMessage({
 				chat_id: message.chat.id,
 				parse_mode: 'Markdown',
 				text: rooms.join("\n"),
 				reply_markup: JSON.stringify(markup)
-			}).catch(_.noop);
+			}).catch(() => {});
 		}
 	}).catch(function(err) {
 		console.error(err);
@@ -780,7 +796,7 @@ function showRoomDetails(query) {
 			}
 
 			var lines = [];
-			_.each(reservations, function(reservation) {
+			reservations.forEach(function(reservation) {
 				var start_time = getShortTimeString(reservation.start);
 				var start_date = getShortDateString(reservation.start);
 				var end_time = getShortTimeString(reservation.end, true);
@@ -807,16 +823,16 @@ function showRoomDetails(query) {
 				message_id: query.message.message_id,
 				reply_markup: JSON.stringify({
 					inline_keyboard: [[
-						{text: '<< früher', callback_data: `/room ${room} before:` + _.min(reservations, function(reservation) {return reservation.start}).start.getTime()},
+						{text: '<< früher', callback_data: `/room ${room} before:` + reservations.map(reservation => reservation.start.getTime()).reduce((min, start) => start < min ? start : min)},
 						{text: 'jetzt', callback_data: `/room ${room}`},
-						{text: 'später >>', callback_data: `/room ${room} after:` + _.max(reservations, function(reservation) {return reservation.start}).start.getTime()}
+						{text: 'später >>', callback_data: `/room ${room} after:` + reservations.map(reservation => reservation.start.getTime()).reduce((max, start) => start > max ? start : max)}
 					], [
 						{text: 'Alle Räume', callback_data: '/buero'}
 					]]
 				}),
 				parse_mode: 'Markdown',
 				text: `Reservierungen im [${room}](${config.rooms[room].html}):\n` + lines.join("\n")
-			}).catch(_.noop);
+			}).catch(() => {});
 		} else {
 			var buttons = [{text: 'jetzt', callback_data: `/room ${room}`}];
 			if (before) {
@@ -833,17 +849,17 @@ function showRoomDetails(query) {
 				}),
 				parse_mode: 'Markdown',
 				text: `[${room}](${config.rooms[room].html})\nkeine Reservierungen für diesen Zeitraum vorhanden`
-			}).catch(_.noop);
+			}).catch(() => {});
 		}
 		bot.answerCallbackQuery({
 			callback_query_id: query.id
-		}).catch(_.noop);
+		}).catch(() => {});
 	}).catch(function(err) {
 		console.error(err);
 		bot.answerCallbackQuery({
 			callback_query_id: query.id,
 			text: 'Fehler beim Laden'
-		}).catch(_.noop);
+		}).catch(() => {});
 	});
 }
 
@@ -885,7 +901,7 @@ function fetchContacts(save, reject) {
 			});
 			res.on('end', function(result) {
 				client.destroy();
-				save(_.sortBy(data, 'displayName'), 43200000);
+				save(data.sort((a, b) => a.displayName < b.displayName ? -1 : 1), 43200000);
 			});
 		});
 	});
@@ -904,7 +920,7 @@ function showContactsHelp(message, user) {
 				[{text: 'anderer Chat', switch_inline_query: user.givenName}]
 			]
 		})
-	}).catch(_.noop);
+	}).catch(() => {});
 }
 
 function searchContacts(query) {
@@ -921,8 +937,8 @@ function searchContacts(query) {
 				switch_pm_parameter: 'contacts'
 			});
 		} else {
-			cache.get('contacts', fetchContacts).then(function(contacts) {
-				var results = _.filter(contacts, function(contact) {
+			cache.get('contacts', fetchContacts).then(function(contacts: any[]) {
+				var results = contacts.filter(function(contact) {
 					return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
 				});
 				if (!results.length) {
@@ -935,7 +951,7 @@ function searchContacts(query) {
 					next_result = max_results + Number.parseInt(query.offset ? query.offset : 0);
 					results = results.splice(0, max_results);
 				}
-				results = _.map(results, function(contact) {
+				results = results.map(function(contact) {
 					return {
 						type: 'contact',
 						id: contact.name,
@@ -1007,7 +1023,7 @@ function updateSimplePoll(query, user) {
 		bot.answerCallbackQuery({
 			callback_query_id: query.id,
 			text: 'Anfrage nicht mehr gefunden',
-		}).catch(_.noop);
+		}).catch(() => {});
 		return;
 	}
 
@@ -1045,8 +1061,8 @@ function updateSimplePoll(query, user) {
 		parse_mode: 'HTML',
 		text: text,
 		reply_markup: JSON.stringify(getSimplePollReplyMarkup(match.groups.query_id)),
-	}).catch(_.noop);
+	}).catch(() => {});
 	bot.answerCallbackQuery({
 		callback_query_id: query.id,
-	}).catch(_.noop);
+	}).catch(() => {});
 }

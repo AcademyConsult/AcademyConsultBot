@@ -1,4 +1,3 @@
-import { _ } from 'underscore';
 import url from 'url';
 import https from 'https';
 
@@ -15,14 +14,14 @@ export function Unifi(base_url, username, password, site) {
 	site = site || 'default';
 
 	function ApiCall(path, params) {
-		var options = _.extend({}, defaults, {
+		var options = Object.assign({}, defaults, {
 			path: `${base_path}api/login`
 		});
 		return _doRequest(options, {username, password})
 			.then(function(response: any) {
 				var {result, data} = response;
 				if (result.headers['set-cookie']) {
-					var options = _.extend({}, defaults, {
+					var options = Object.assign({}, defaults, {
 						path: base_path + path,
 						headers: {
 							Cookie: result.headers['set-cookie']
@@ -57,14 +56,14 @@ export function Unifi(base_url, username, password, site) {
 	this.handleAlarms = function(handler) {
 		ApiCall(`api/s/${site}/list/alarm`, {_sort: '-time', archived: false})
 			.then(function(alarms) {
-				_.each(alarms, function(alarm) {
+				alarms.forEach(function(alarm) {
 					var handled = handler(alarm);
 					if (handled) {
-						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(_.noop);
+						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(() => {});
 					}
 				});
 			})
-			.catch(_.noop);
+			.catch(() => {});
 	};
 }
 
@@ -72,7 +71,7 @@ function _doRequest(options, data) {
 	return new Promise(function(resolve, reject) {
 		if (data) {
 			data = JSON.stringify(data);
-			options.headers = _.extend({}, options.headers, {
+			options.headers = Object.assign({}, options.headers, {
 				'Content-Type': 'application/x-www-form-urlencoded',
 				'Content-Length': data.length
 			});
