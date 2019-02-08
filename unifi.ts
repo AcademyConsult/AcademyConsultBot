@@ -1,37 +1,96 @@
 import url from 'url';
-import https from 'https';
+import { IncomingMessage } from 'http';
+import https, { RequestOptions } from 'https';
 
-export function Unifi(base_url, username, password, site) {
-	var cookie;
-	var parts     = url.parse(base_url);
-	var base_path = parts.pathname;
-	var defaults  = {
-		protocol: parts.protocol,
-		hostname: parts.hostname,
-		port: parts.port,
-		rejectUnauthorized: false
+interface ApiResponse {
+	meta?: {
+		rc: 'ok',
+		msg?: string,
 	};
-	site = site || 'default';
+	data?: Object;
+}
 
-	function ApiCall(path, params) {
-		var options = Object.assign({}, defaults, {
-			path: `${base_path}api/login`
+interface Alarm {
+	_id: number;
+	msg: string;
+	ap: string;
+	ap_name: string;
+	time: number;
+}
+
+export class Unifi {
+	private defaults: RequestOptions;
+	private base_path: string;
+
+	constructor(
+		base_url: string,
+		private username: string,
+		private password: string,
+		private site: string = 'default'
+	) {
+		var parts = url.parse(base_url);
+		this.base_path = parts.pathname;
+		this.defaults  = {
+			protocol: parts.protocol,
+			hostname: parts.hostname,
+			port: parts.port,
+			rejectUnauthorized: false
+		};
+	}
+
+	private async _doRequest(options: RequestOptions, data?: Object): Promise<{result: IncomingMessage, data: string}> {
+		return new Promise(function(resolve, reject) {
+			let body: string = null;
+			if (data) {
+				body = JSON.stringify(data);
+				options.headers = Object.assign({}, options.headers, {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					'Content-Length': body.length
+				});
+				options.method = 'POST';
+			}
+
+			var request = https.request(options, function(result) {
+				var data = '';
+				result.on('data', function (chunk) {
+					data += chunk;
+				});
+				result.on('end', function() {
+					resolve({result, data});
+				});
+			});
+
+			request.on('error', function(event) {
+				reject(event.message);
+			});
+
+			if (body) {
+				request.write(body);
+			}
+
+			request.end();
 		});
-		return _doRequest(options, {username, password})
-			.then(function(response: any) {
+	}
+
+	public async ApiCall<T>(path: string, params?: Object): Promise<T> {
+		var options = Object.assign({}, this.defaults, {
+			path: `${this.base_path}api/login`
+		});
+		return this._doRequest(options, {username: this.username, password: this.password})
+			.then(async response => {
 				var {result, data} = response;
 				if (result.headers['set-cookie']) {
-					var options = Object.assign({}, defaults, {
-						path: base_path + path,
+					var options = Object.assign({}, this.defaults, {
+						path: this.base_path + path,
 						headers: {
 							Cookie: result.headers['set-cookie']
 						}
 					});
-					return _doRequest(options, params)
-						.then(function (response: any) {
-							var {result, data} = response;
+					return this._doRequest(options, params)
+						.then(function (response) {
+							var data: ApiResponse;
 							try {
-								data = JSON.parse(data);
+								data = JSON.parse(response.data);
 							} catch (e) {
 								return Promise.reject(e);
 							}
@@ -44,58 +103,24 @@ export function Unifi(base_url, username, password, site) {
 								return Promise.reject(data.meta.msg);
 							}
 
-							return data.data;
+							return Promise.resolve(<T>data.data);
 						});
 				} else {
 					return Promise.reject(data);
 				}
 			});
 	};
-	this.ApiCall = ApiCall;
 
-	this.handleAlarms = function(handler) {
-		ApiCall(`api/s/${site}/list/alarm`, {_sort: '-time', archived: false})
-			.then(function(alarms) {
+	public handleAlarms(handler: (alarm: Alarm) => boolean): void {
+		this.ApiCall<Alarm[]>(`api/s/${this.site}/list/alarm`, {_sort: '-time', archived: false})
+			.then(alarms => {
 				alarms.forEach(function(alarm) {
 					var handled = handler(alarm);
 					if (handled) {
-						ApiCall(`api/s/${site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(() => {});
+						this.ApiCall(`api/s/${this.site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(() => {});
 					}
 				});
 			})
 			.catch(() => {});
 	};
-}
-
-function _doRequest(options, data) {
-	return new Promise(function(resolve, reject) {
-		if (data) {
-			data = JSON.stringify(data);
-			options.headers = Object.assign({}, options.headers, {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				'Content-Length': data.length
-			});
-			options.method = 'POST';
-		}
-
-		var request = https.request(options, function(result) {
-			var data = '';
-			result.on('data', function (chunk) {
-				data += chunk;
-			});
-			result.on('end', function() {
-				resolve({result, data});
-			});
-		});
-
-		request.on('error', function(event) {
-			reject(event.message);
-		});
-
-		if (data) {
-			request.write(data);
-		}
-
-		request.end();
-	});
 }

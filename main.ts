@@ -23,7 +23,7 @@ var bot = new telegram({
 	}
 });
 
-var controllers = [];
+var controllers: Unifi[] = [];
 for (let i = 0; i < config.controllers.length; i++) {
 	var controller: {uri: string, username: string, password: string, site?: string} = config.controllers[i];
 	controllers.push(new Unifi(
@@ -293,7 +293,7 @@ function verifyNewChatMembers(message) {
 function _showControllerInfos(message, endpoint, parser, formatter) {
 	controllers.forEach(function(controller, i) {
 		startTyping(message.chat.id);
-		controller.ApiCall(endpoint).then(function(data) {
+		controller.ApiCall<any[]>(endpoint).then(function(data) {
 			var stats = {
 				users: 0,
 				guests: 0,
@@ -378,7 +378,8 @@ function showStatus(message) {
 
 controllers.forEach(function(controller, i) {
 	if (config.controllers[i].subscribers && config.controllers[i].subscribers.length) {
-		setInterval(controller.handleAlarms, 10000, function(alarm) {
+		setInterval(() => {
+			controller.handleAlarms(function(alarm) {
 				if (alarm.msg) {
 					var msg = alarm.msg;
 					if (alarm.ap && alarm.ap_name) {
@@ -400,8 +401,8 @@ controllers.forEach(function(controller, i) {
 					return true;
 				}
 				return false;
-			}
-		);
+			})
+		}, 1000);
 	}
 });
 
