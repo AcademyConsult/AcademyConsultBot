@@ -62,9 +62,18 @@ Die verfügbaren Optionen werden global in der `simple_poll`-Konfiguration
 festgelegt (siehe unten).
 
 ## Ausführung
+### Mit Docker
 Der Bot kann als Docker-Container gebaut und gestartet werden mit einem einfachen
-```
+```bash
 docker-compose up -d
+```
+
+### Mit `nodejs`
+Wenn `node`/`npm` bereits lokal installiert ist, kann der Bot auch direkt
+ausgeführt werden:
+```bash
+npm install # nur vor dem ersten Start benötigt
+npm start
 ```
 
 ### Konfiguration
@@ -103,7 +112,7 @@ benötigt.
 
 ### Entwicklung
 Für die lokale Entwicklung kann der Bot auch über
-```
+```bash
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 gestartet werden. Dadurch wird das komplette Verzeichnis unter `/app` in den
@@ -112,3 +121,8 @@ sofort sichtbar sind und durch `ts-node-dev` direkt ausgeführt werden sowie der
 [node inspector](https://nodejs.org/en/docs/inspector/) gestartet, sodass man in
 Chrome über `chrome://inspect` den laufenden Bot mit den DevTools öffnen und live
 debuggen kann.
+
+Bei der direkten Ausführung ohne Docker ist der analoge Befehl:
+```bash
+npm run start:dev
+```

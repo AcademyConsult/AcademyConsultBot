@@ -17,6 +17,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "start:dev": "ts-node-dev --inspect=9229 main.ts",
     "start": "ts-node main.ts"
   },
   "author": "Roman Anasal <roman.anasal@academyconsult.de>",
