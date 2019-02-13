@@ -1,7 +1,20 @@
 {
-  "name": "telegram_bot",
-  "version": "0.0.3",
-  "description": "",
+  "name": "AcademyConsultBot",
+  "version": "2.0.1",
+  "description": "Der hilfreiche Telegram-Bot von Academy Consult",
+  "homepage": "https://github.com/AcademyConsult/AcademyConsultBot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AcademyConsult/AcademyConsultBot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AcademyConsult/AcademyConsultBot/issues"
+  },
+  "keywords": [
+    "Academy Consult",
+    "Bot",
+    "Telegram"
+  ],
   "main": "main.ts",
   "dependencies": {
     "@types/node": "^10.12.18",
