@@ -608,13 +608,13 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 				lines.push(line_renderer(dateString, timeString, event));
 			});
 
-			markup = JSON.stringify({
+			markup = {
 				inline_keyboard: [[
 					{text: '<< früher', callback_data: `/${command} before:` + events.map(event => event.start.getTime()).reduce((min, start) => start < min ? start : min)},
 					{text: 'jetzt', callback_data: `/${command}`},
 					{text: 'später >>', callback_data: `/${command} after:` + events.map(event => event.start.getTime()).reduce((max, start) => start > max ? start : max)}
 				]]
-			});
+			};
 			text += lines.join("\n");
 		} else {
 			var buttons = [{text: 'jetzt', callback_data: `/${command}`}];
@@ -624,9 +624,9 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 				buttons.unshift({text: '<< früher', callback_data: `/${command} before:` + (after + 1)});
 			}
 
-			markup = JSON.stringify({
+			markup = {
 				inline_keyboard: [buttons]
-			});
+			};
 			text += 'Keine Events in diesem Zeitraum vorhanden';
 		}
 
@@ -751,7 +751,7 @@ function showReservations(query) {
 				message_id: query.message.message_id,
 				parse_mode: 'Markdown',
 				text: rooms.join("\n"),
-				reply_markup: JSON.stringify(markup)
+				reply_markup: markup
 			}).catch(() => {});
 			bot.answerCallbackQuery({
 				callback_query_id: query.id
@@ -761,7 +761,7 @@ function showReservations(query) {
 				chat_id: message.chat.id,
 				parse_mode: 'Markdown',
 				text: rooms.join("\n"),
-				reply_markup: JSON.stringify(markup)
+				reply_markup: markup
 			}).catch(() => {});
 		}
 	}).catch(function(err) {
@@ -822,7 +822,7 @@ function showRoomDetails(query) {
 			bot.editMessageText({
 				chat_id: query.message.chat.id,
 				message_id: query.message.message_id,
-				reply_markup: JSON.stringify({
+				reply_markup: {
 					inline_keyboard: [[
 						{text: '<< früher', callback_data: `/room ${room} before:` + reservations.map(reservation => reservation.start.getTime()).reduce((min, start) => start < min ? start : min)},
 						{text: 'jetzt', callback_data: `/room ${room}`},
@@ -830,7 +830,7 @@ function showRoomDetails(query) {
 					], [
 						{text: 'Alle Räume', callback_data: '/buero'}
 					]]
-				}),
+				},
 				parse_mode: 'Markdown',
 				text: `Reservierungen im [${room}](${config.rooms[room].html}):\n` + lines.join("\n")
 			}).catch(() => {});
@@ -845,9 +845,9 @@ function showRoomDetails(query) {
 			bot.editMessageText({
 				chat_id: query.message.chat.id,
 				message_id: query.message.message_id,
-				reply_markup: JSON.stringify({
+				reply_markup: {
 					inline_keyboard: [buttons, [{text: 'Alle Räume', callback_data: '/buero'}]]
-				}),
+				},
 				parse_mode: 'Markdown',
 				text: `[${room}](${config.rooms[room].html})\nkeine Reservierungen für diesen Zeitraum vorhanden`
 			}).catch(() => {});
@@ -915,12 +915,12 @@ function showContactsHelp(message, user) {
 			+ `Dazu musst du nur in deine Eingabezeile \"@${config.name}\" gefolgt von einem Namen eingeben. `
 			+ "Es werden dabei nur Kontakte angezeigt, für die eine Handynummer im SharePoint hinterlegt wurde!\n"
 			+ "Für ein Beispiel drücke einen der Buttons:",
-		reply_markup: JSON.stringify({
+		reply_markup: {
 			inline_keyboard: [
 				[{text: 'direkt hier', switch_inline_query_current_chat: user.givenName}],
 				[{text: 'anderer Chat', switch_inline_query: user.givenName}]
 			]
-		})
+		}
 	}).catch(() => {});
 }
 
@@ -932,7 +932,7 @@ function searchContacts(query) {
 			bot.answerInlineQuery({
 				inline_query_id: query.id,
 				results: [],
-				is_personal: 'true',
+				is_personal: true,
 				cache_time: 0,
 				switch_pm_text: 'Bitte erst einloggen',
 				switch_pm_parameter: 'contacts'
@@ -972,7 +972,7 @@ function searchContacts(query) {
 				bot.answerInlineQuery({
 					inline_query_id: query.id,
 					results: results,
-					is_personal: 'true',
+					is_personal: true,
 					cache_time: 0,
 					next_offset: next_result
 				});
@@ -1013,7 +1013,7 @@ function getSimplePollResults(query) {
 			},
 			reply_markup: getSimplePollReplyMarkup(query.id),
 		}],
-		is_personal: 'true',
+		is_personal: true,
 		cache_time: 0,
 	}).catch(console.log);
 }
@@ -1061,7 +1061,7 @@ function updateSimplePoll(query, user) {
 		inline_message_id: query.inline_message_id,
 		parse_mode: 'HTML',
 		text: text,
-		reply_markup: JSON.stringify(getSimplePollReplyMarkup(match.groups.query_id)),
+		reply_markup: getSimplePollReplyMarkup(match.groups.query_id),
 	}).catch(() => {});
 	bot.answerCallbackQuery({
 		callback_query_id: query.id,
