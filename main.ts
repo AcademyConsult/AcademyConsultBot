@@ -144,8 +144,13 @@ function wrapRestrictedCommand(command) {
 		}).then(function(user) {
 			if (user) {
 				command(query, user);
+			} else if (!('chat' in query)) {
+				bot.answerCallbackQuery({
+					callback_query_id: query.id,
+					url: `t.me/${config.name}?start=inline`,
+				}).catch(() => {});
 			} else {
-				var message = query.message || query;
+				var message = query;
 				var text = "Dieser Bot ist nur für Mitglieder von Academy Consult München e.V. verfügbar.\n";
 				var parse_mode = undefined;
 				if (query.from.id != message.chat.id) {
