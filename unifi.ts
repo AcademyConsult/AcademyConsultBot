@@ -2,6 +2,20 @@ import url from 'url';
 import { IncomingMessage } from 'http';
 import https, { RequestOptions } from 'https';
 
+//FIXME: add all available properties
+export type UnifiClient = {
+	_is_guest_by_uap: boolean;
+	name: string;
+	essid: string;
+};
+
+//FIXME: add all available properties
+export type UnifiSta = {
+	['guest-num_sta']: number;
+	['state']: number;
+	['user-num_sta']: number;
+};
+
 interface ApiResponse {
 	meta?: {
 		rc: 'ok',
@@ -114,7 +128,7 @@ export class Unifi {
 	public handleAlarms(handler: (alarm: Alarm) => boolean): void {
 		this.ApiCall<Alarm[]>(`api/s/${this.site}/list/alarm`, {_sort: '-time', archived: false})
 			.then(alarms => {
-				alarms.forEach(function(alarm) {
+				alarms.forEach(alarm => {
 					var handled = handler(alarm);
 					if (handled) {
 						this.ApiCall(`api/s/${this.site}/cmd/evtmgr`, {_id: alarm._id, cmd: "archive-alarm"}).catch(() => {});

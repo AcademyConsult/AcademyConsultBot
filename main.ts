@@ -1,11 +1,21 @@
 import telegram  from 'telegram-bot-api';
-import { Unifi } from './unifi';
 import https     from 'https';
 import ical      from 'node-ical';
 import { Cache } from './cache';
 import ldap      from 'ldapjs';
 import fs        from 'fs';
 import config    from './config.json';
+
+import { Message, CallbackQuery, InlineQuery, InlineKeyboardMarkup } from 'telegram-typings';
+import { Unifi, UnifiClient, UnifiSta } from './unifi';
+import {
+	ADUser,
+	BotCommand,
+	InlineCommand,
+	InlineQueryOrMessageHandler,
+	WifiStats,
+	SimplePolls,
+} from './types';
 
 // force local timezone to be UTC
 // rrule is quite buggy when the system time is not UTC,
@@ -25,7 +35,7 @@ var bot = new telegram({
 
 var controllers: Unifi[] = [];
 for (let i = 0; i < config.controllers.length; i++) {
-	var controller: {uri: string, username: string, password: string, site?: string} = config.controllers[i];
+	var controller = config.controllers[i];
 	controllers.push(new Unifi(
 		controller.uri,
 		controller.username,
@@ -34,7 +44,7 @@ for (let i = 0; i < config.controllers.length; i++) {
 	));
 }
 
-var commands = [
+var commands: BotCommand[] = [
 	{
 		name: '/start',
 		handler: wrapRestrictedCommand(runStart)
@@ -73,7 +83,7 @@ var commands = [
 	}
 ];
 
-var inline_callbacks = [
+var inline_callbacks: InlineCommand[] = [
 	{
 		pattern: /\/room/,
 		handler: wrapRestrictedCommand(showRoomDetails)
@@ -96,7 +106,7 @@ var inline_callbacks = [
 	}
 ];
 
-var subscribers = [];
+var subscribers: number[] = [];
 var countdown = 0;
 
 bot.on('message', function(message) {
@@ -126,10 +136,14 @@ bot.on('inline.callback.query', function(query) {
 
 bot.on('inline.query', searchContacts);
 
-function wrapRestrictedCommand(command) {
-	return function(query) {
+function messageIsCallbackQuery(query: Message | CallbackQuery): query is CallbackQuery {
+	return !('chat' in query);
+}
+
+function wrapRestrictedCommand(command: InlineQueryOrMessageHandler): InlineQueryOrMessageHandler {
+	return function(query: CallbackQuery | Message) {
 		getADUser(query.from.id).catch(function(error) {
-			if (query.data) {
+			if (messageIsCallbackQuery(query)) {
 				bot.answerCallbackQuery({
 					callback_query_id: query.id,
 					text: 'Fehler beim Laden der Benutzerdaten'
@@ -144,7 +158,7 @@ function wrapRestrictedCommand(command) {
 		}).then(function(user) {
 			if (user) {
 				command(query, user);
-			} else if (!('chat' in query)) {
+			} else if (messageIsCallbackQuery(query)) {
 				bot.answerCallbackQuery({
 					callback_query_id: query.id,
 					url: `t.me/${config.name}?start=inline`,
@@ -152,16 +166,14 @@ function wrapRestrictedCommand(command) {
 			} else {
 				var message = query;
 				var text = "Dieser Bot ist nur für Mitglieder von Academy Consult München e.V. verfügbar.\n";
-				var parse_mode = undefined;
 				if (query.from.id != message.chat.id) {
 					text += `Bitte schreibe mir eine private Nachricht an @${config.name}, um dich freizuschalten.`;
 				} else {
 					text += `Bitte [logge dich hier ein](https://www.acintern.de/telegram?id=${query.from.id}), um dich freizuschalten.`;
-					parse_mode = 'Markdown';
 				}
 				bot.sendMessage({
 					chat_id: message.chat.id,
-					parse_mode: parse_mode,
+					parse_mode: 'Markdown',
 					text: text
 				}).catch(() => {});
 			}
@@ -171,8 +183,8 @@ function wrapRestrictedCommand(command) {
 	}
 }
 
-function getADUser(uid) {
-	return cache.get(`aduser.${uid}`, function(store, reject) {
+function getADUser(uid: number): Promise<ADUser> {
+	return cache.get<ADUser>(`aduser.${uid}`, function(store, reject) {
 		var client = ldap.createClient({
 			url: config.ldap.uri,
 			tlsOptions: {
@@ -199,7 +211,7 @@ function getADUser(uid) {
 					return;
 				}
 
-				var data;
+				var data: ADUser;
 				res.on('searchEntry', function(entry) {
 					data = entry.object;
 				});
@@ -224,15 +236,15 @@ function getADUser(uid) {
 	});
 }
 
-function startTyping(chat_id) {
+function startTyping(chat_id: string | number): void {
 	bot.sendChatAction({
 		chat_id: chat_id,
 		action: 'typing'
 	}).catch(() => {});
 }
 
-function inviteUserToGroup(user_id, group_id, group_name) {
-	cache.get(`inviteLink.${group_id}`, function(resolve, reject) {
+function inviteUserToGroup(user_id: string | number, group_id: number, group_name: string): void {
+	cache.get<string>(`inviteLink.${group_id}`, function(resolve, reject) {
 		bot.exportChatInviteLink({chat_id: group_id}).then(function(inviteLink) {
 			resolve(inviteLink, 86400000);
 		}).catch(reject);
@@ -247,7 +259,7 @@ function inviteUserToGroup(user_id, group_id, group_name) {
 	});
 }
 
-function runStart(message, user) {
+function runStart(message: Message, user: ADUser): void {
 	if (message.from.id === message.chat.id) {
 		bot.sendMessage({
 			chat_id: message.from.id,
@@ -272,8 +284,8 @@ function runStart(message, user) {
 	}
 }
 
-function verifyNewChatMembers(message) {
-	var promises = (<any[]>message.new_chat_members).map(function(member) {
+function verifyNewChatMembers(message: Message): void {
+	var promises = message.new_chat_members.map(function(member) {
 		return getADUser(member.id).then(function(user) {
 			return {user, member};
 		}).catch(function(err) {
@@ -295,11 +307,16 @@ function verifyNewChatMembers(message) {
 	});
 }
 
-function _showControllerInfos(message, endpoint, parser, formatter) {
+function _showControllerInfos(
+	message: Message,
+	endpoint: string,
+	parser: (this: WifiStats, data: UnifiSta | UnifiClient) => void,
+	formatter: (stats: WifiStats, controller: Unifi, i: number) => string
+): void {
 	controllers.forEach(function(controller, i) {
 		startTyping(message.chat.id);
-		controller.ApiCall<any[]>(endpoint).then(function(data) {
-			var stats = {
+		controller.ApiCall<Array<UnifiSta | UnifiClient>>(endpoint).then(function(data) {
+			var stats: WifiStats = {
 				users: 0,
 				guests: 0,
 				aps: 0,
@@ -330,11 +347,11 @@ function _showControllerInfos(message, endpoint, parser, formatter) {
 	});
 }
 
-function showDetails(message) {
+function showDetails(message: Message): void {
 	_showControllerInfos(
 		message,
 		'api/s/default/stat/sta',
-		function(client) {
+		function(client: UnifiClient) {
 			var stats = this;
 			if (config.excluded_essids.indexOf(client.essid) > -1) {
 				return;
@@ -355,11 +372,11 @@ function showDetails(message) {
 	);
 }
 
-function showStatus(message) {
+function showStatus(message: Message): void {
 	_showControllerInfos(
 		message,
 		'api/s/default/stat/device',
-		function(ap) {
+		function(ap: UnifiSta) {
 			var stats = this;
 			if (ap.state == 1) {
 				stats.aps++;
@@ -411,7 +428,7 @@ controllers.forEach(function(controller, i) {
 	}
 });
 
-function _sendCountdown(chat_id) {
+function _sendCountdown(chat_id: number): void {
 	bot.sendMessage({
 		chat_id: chat_id,
 		text: `Aktuelle Anzahl Bewerbungen: ${countdown}`
@@ -420,7 +437,7 @@ function _sendCountdown(chat_id) {
 
 setInterval(_updateCountdown, 30000);
 
-function _updateCountdown(callback) {
+function _updateCountdown(callback?: (changed: boolean) => void): void {
 	callback = callback || function() {};
 	var options = {
 		host: config.countdown.host,
@@ -452,7 +469,7 @@ function _updateCountdown(callback) {
 	});
 }
 
-function showApplicants(message) {
+function showApplicants(message: Message): void {
 	startTyping(message.chat.id);
 	var chat_id = message.chat.id;
 	_updateCountdown(function(changed) {
@@ -462,7 +479,7 @@ function showApplicants(message) {
 	});
 }
 
-function subscribe(message) {
+function subscribe(message: Message): void {
 	var index = subscribers.indexOf(message.chat.id);
 	if (index == -1) {
 		subscribers.push(message.chat.id);
@@ -479,18 +496,18 @@ function subscribe(message) {
 	}
 }
 
-function addLeading0s(string) {
+function addLeading0s(string: string): string {
 	return string.replace(/(^|\D)(?=\d(?!\d))/g, '$10');
 }
 
-function getShortDateString(date, is_end?) {
+function getShortDateString(date: Date, is_end = false): string {
 	if (is_end) {
-		date = new Date(date - 1);
+		date = new Date(date.getTime() - 1);
 	}
 	return addLeading0s([date.getDate(), (date.getMonth()+1), ''].join('.'));
 }
 
-function getShortTimeString(date, is_end?) {
+function getShortTimeString(date: Date, is_end = false): string {
 	var time = addLeading0s([date.getHours(), date.getMinutes()].join(':'));
 	if (is_end && time == '00:00') {
 		time = '24:00';
@@ -498,18 +515,23 @@ function getShortTimeString(date, is_end?) {
 	return time;
 }
 
-function filterEvents(cal_events, count, after, before?) {
-	after = new Date(after);
-	before = new Date(before);
+function filterEvents(
+	cal_events: ical.Events | ical.Event[],
+	count: number,
+	afterArg: number | Date,
+	beforeArg?: number | Date
+): ical.Event[] {
+	let after = new Date(afterArg);
+	let before = new Date(beforeArg);
 
-	let events: any[] = Object.values(cal_events);
+	let events = Object.values(cal_events);
 
 	var results = events.filter(function(event) {
 		return event.end > after || event.start < before;
 	});
 
 	events.filter(event => event.recurrences).forEach(event => {
-		Object.values(event.recurrences).forEach((recurrence: any) => {
+		Object.values(event.recurrences).forEach(recurrence => {
 			if (recurrence.end > after || recurrence.start < before) {
 				results.push(recurrence);
 			}
@@ -543,7 +565,7 @@ function filterEvents(cal_events, count, after, before?) {
 							results.push({
 								summary: event.summary,
 								start: newstart,
-								end: new Date(event.end.getTime() + (newstart - event.start))
+								end: new Date(event.end.getTime() + (newstart - event.start.getTime()))
 							});
 						}
 					}
@@ -556,9 +578,8 @@ function filterEvents(cal_events, count, after, before?) {
 	return count ? results.splice(ascending ? 0 : -count, count) : results;
 }
 
-function loadCalendar(cache_key, url, ttl?) {
-	ttl = ttl || 120000;
-	return cache.get(cache_key, function(store, reject) {
+function loadCalendar(cache_key: string, url: string, ttl = 120000): Promise<ical.Events> {
+	return cache.get<ical.Events>(cache_key, function(store, reject) {
 		ical.fromURL(url, {}, function(err, data) {
 			if (err) {
 				reject(err);
@@ -569,17 +590,22 @@ function loadCalendar(cache_key, url, ttl?) {
 	});
 }
 
-function _renderPaginatedCalendar(query, command, calendar_promise, header, line_renderer) {
-	var after, before;
-	var message;
-	if (query.data) {
+function _renderPaginatedCalendar(
+	query: Message | CallbackQuery,
+	command: string,
+	calendar_promise: Promise<ical.Events | ical.Event[]>,
+	header: string,
+	line_renderer: (dateString: string,timeString: string, event: ical.Event) => string
+): void {
+	var after: number, before: number;
+	var message: Message;
+	if (messageIsCallbackQuery(query)) {
 		var parts = query.data.match(new RegExp(`\/${command}(?: after:([0-9]+))?(?: before:([0-9]+))?`));
 		after = Number.parseInt(parts[1]);
 		before = Number.parseInt(parts[2]);
 		message = query.message;
 	} else {
 		message = query;
-		query = false;
 	}
 
 	startTyping(message.chat.id);
@@ -592,7 +618,7 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 		var events = filterEvents(data, 5, after, before);
 
 		var text = header;
-		var markup;
+		var markup: InlineKeyboardMarkup;
 
 		if (events.length) {
 			if (before) {
@@ -601,13 +627,13 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 				events = events.splice(0, 5);
 			}
 
-			var lines = [];
+			var lines: string[] = [];
 			events.forEach(function(event) {
 				var dateString = getShortDateString(event.start);
 				var timeString = '';
-				if (event.end - event.start > 86400000) { // more than 24h
+				if (event.end.getTime() - event.start.getTime() > 86400000) { // more than 24h
 					dateString += ` - ${getShortDateString(event.end, true)}`;
-				} else if (event.end - event.start < 86400000) { // less than 24h, i.e. NOT an all-day event
+				} else if (event.end.getTime() - event.start.getTime() < 86400000) { // less than 24h, i.e. NOT an all-day event
 					timeString = ` (${getShortTimeString(event.start)} Uhr)`
 				}
 				lines.push(line_renderer(dateString, timeString, event));
@@ -635,7 +661,7 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 			text += 'Keine Events in diesem Zeitraum vorhanden';
 		}
 
-		if (query) {
+		if (messageIsCallbackQuery(query)) {
 			bot.editMessageText({
 				chat_id: query.message.chat.id,
 				message_id: query.message.message_id,
@@ -654,12 +680,12 @@ function _renderPaginatedCalendar(query, command, calendar_promise, header, line
 				reply_markup: markup
 			}).catch(() => {});
 		}
-	}).catch(function(err) {
+	}).catch(function(err: any) {
 		console.error(err);
 	});
 }
 
-function showEvents(query) {
+function showEvents(query: Message | CallbackQuery): void {
 	_renderPaginatedCalendar(
 		query,
 		'events',
@@ -671,8 +697,8 @@ function showEvents(query) {
 	);
 }
 
-function showBDSUEvents(query) {
-	var events = cache.get('calendars.bdsu', function(store, reject) {
+function showBDSUEvents(query: Message | CallbackQuery): void {
+	var events = cache.get<ical.Event[]>('calendars.bdsu', function(store, reject) {
 		return loadCalendar('calendars.events', config.events.ical).then(function(data) {
 			let events = Object.values(data).filter(function(event) {
 				return event.summary && event.summary.match(/BDSU|Bayern ?(\+|plus)|Kongress|JADE|CCT/i)
@@ -692,11 +718,11 @@ function showBDSUEvents(query) {
 	);
 }
 
-function showReservations(query) {
-	var message = query.data ? query.message : query;
+function showReservations(query: Message | CallbackQuery): void {
+	var message = messageIsCallbackQuery(query) ? query.message : query;
 	startTyping(message.chat.id);
 
-	var promises = [];
+	var promises: Promise<{room: string, line: string}>[] = [];
 
 	var now = Date.now();
 	Object.keys(config.rooms).forEach(room => {
@@ -707,15 +733,15 @@ function showReservations(query) {
 
 			var reservation = reservations.shift();
 			if (reservation) {
-				if (reservation.start <= now) {
+				if (reservation.start.getTime() <= now) {
 					var next;
 					var users = [reservation.summary.trim()];
-					while ((next = reservations.shift()) && next.start - reservation.end < 900000) { // less than 15min until next reservation
+					while ((next = reservations.shift()) && next.start.getTime() - reservation.end.getTime() < 900000) { // less than 15min until next reservation
 						users.push(next.summary.trim());
 						reservation = next;
 					}
 					line = 'belegt bis '
-						+ (reservation.end - now > 86400000 ? getShortDateString(reservation.end, true) + ', ' : '')
+						+ (reservation.end.getTime() - now > 86400000 ? getShortDateString(reservation.end, true) + ', ' : '')
 						+ getShortTimeString(reservation.end, true) + ' Uhr von ' + users.reduce((values, value) => {
 							if (values.indexOf(value) === -1) {
 								values.push(value);
@@ -724,7 +750,7 @@ function showReservations(query) {
 						}, []).join(', ');
 				} else {
 					line = 'frei bis '
-						+ (reservation.start - now > 86400000 ? getShortDateString(reservation.start) + ', ' : '')
+						+ (reservation.start.getTime() - now > 86400000 ? getShortDateString(reservation.start) + ', ' : '')
 						+ getShortTimeString(reservation.start) + ' Uhr';
 				}
 			} else {
@@ -736,9 +762,9 @@ function showReservations(query) {
 	});
 
 	Promise.all(promises).then(function(results) {
-		var lines = {};
-		var rooms = [];
-		var markup = {inline_keyboard: []};
+		var lines: {[room: string]: string} = {};
+		var rooms: string[] = [];
+		var markup: InlineKeyboardMarkup = {inline_keyboard: []};
 
 		results.forEach(function(result) {
 			lines[result.room] = result.line;
@@ -750,7 +776,7 @@ function showReservations(query) {
 			markup.inline_keyboard.push([{text: room, callback_data: `/room ${room}`}]);
 		});
 
-		if (query.data) {
+		if (messageIsCallbackQuery(query)) {
 			bot.editMessageText({
 				chat_id: query.message.chat.id,
 				message_id: query.message.message_id,
@@ -774,7 +800,7 @@ function showReservations(query) {
 	});
 }
 
-function showRoomDetails(query) {
+function showRoomDetails(query: CallbackQuery): void {
 	var parts = query.data.match(/\/room (\w+)(?: after:([0-9]+))?(?: before:([0-9]+))?/);
 	var room = parts[1];
 	var after = Number.parseInt(parts[2]);
@@ -801,14 +827,14 @@ function showRoomDetails(query) {
 				reservations = reservations.splice(0, 5);
 			}
 
-			var lines = [];
+			var lines: string[] = [];
 			reservations.forEach(function(reservation) {
 				var start_time = getShortTimeString(reservation.start);
 				var start_date = getShortDateString(reservation.start);
 				var end_time = getShortTimeString(reservation.end, true);
 				var end_date = getShortDateString(reservation.end, true);
 				var time = '';
-				if (reservation.end - reservation.start > 86400000) {
+				if (reservation.end.getTime() - reservation.start.getTime() > 86400000) {
 					if (start_time == '00:00' && end_time == '24:00') {
 						time = `${start_date} - ${end_date}`;
 					} else {
@@ -869,7 +895,10 @@ function showRoomDetails(query) {
 	});
 }
 
-function fetchContacts(save, reject) {
+function fetchContacts(
+	save: (value: ADUser[], ttl?: number) => void,
+	reject: (reason: any) => void
+): void {
 	var client = ldap.createClient({
 		url: config.ldap.uri,
 		tlsOptions: {
@@ -897,7 +926,7 @@ function fetchContacts(save, reject) {
 				return;
 			}
 
-			var data = [];
+			var data: ADUser[] = [];
 			res.on('searchEntry', function(entry) {
 				data.push(entry.object);
 			});
@@ -913,7 +942,7 @@ function fetchContacts(save, reject) {
 	});
 }
 
-function showContactsHelp(message, user) {
+function showContactsHelp(message: Message, user: ADUser): void {
 	bot.sendMessage({
 		chat_id: message.chat.id,
 		text: "Du kannst in jedem Chat nach Telefonnummern von AClern suchen und sie direkt mit deinem Gegenüber teilen.\n"
@@ -929,9 +958,9 @@ function showContactsHelp(message, user) {
 	}).catch(() => {});
 }
 
-function searchContacts(query) {
+function searchContacts(query: InlineQuery): void {
 	var max_results = 15;
-	var next_result;
+	var next_result: number;
 	getADUser(query.from.id).then(function(user) {
 		if (!user) {
 			bot.answerInlineQuery({
@@ -943,21 +972,22 @@ function searchContacts(query) {
 				switch_pm_parameter: 'contacts'
 			});
 		} else {
-			cache.get('contacts', fetchContacts).then(function(contacts: any[]) {
+			cache.get<ADUser[]>('contacts', fetchContacts).then(function(contacts) {
 				var results = contacts.filter(function(contact) {
 					return -1 != contact.name.toLowerCase().indexOf(query.query.toLowerCase());
 				});
 				if (!results.length) {
 					return getSimplePollResults(query);
 				}
-				if (query.offset) {
-					results = results.splice(query.offset);
+				const offset = Number.parseInt(query.offset);
+				if (offset) {
+					results = results.splice(offset);
 				}
 				if (results.length > max_results) {
-					next_result = max_results + Number.parseInt(query.offset ? query.offset : 0);
+					next_result = max_results + (offset ? offset : 0);
 					results = results.splice(0, max_results);
 				}
-				results = results.map(function(contact) {
+				let vcards = results.map(function(contact) {
 					return {
 						type: 'contact',
 						id: contact.name,
@@ -976,7 +1006,7 @@ function searchContacts(query) {
 				});
 				bot.answerInlineQuery({
 					inline_query_id: query.id,
-					results: results,
+					results: vcards,
 					is_personal: true,
 					cache_time: 0,
 					next_offset: next_result
@@ -990,8 +1020,8 @@ function searchContacts(query) {
 	});
 }
 
-let polls = {};
-function getSimplePollReplyMarkup(query_id) {
+let polls: SimplePolls = {};
+function getSimplePollReplyMarkup(query_id: string): InlineKeyboardMarkup {
 	return {
 		inline_keyboard: Object.keys(config.simple_poll.buttons).map(type => {
 			return [{text: config.simple_poll.buttons[type], callback_data: `/poll ${query_id} ${type}`}]
@@ -999,7 +1029,7 @@ function getSimplePollReplyMarkup(query_id) {
 	};
 }
 
-function getSimplePollResults(query) {
+function getSimplePollResults(query: InlineQuery): void {
 	polls[query.id] = {
 		text: query.query,
 		user: query.from,
@@ -1023,7 +1053,7 @@ function getSimplePollResults(query) {
 	}).catch(console.log);
 }
 
-function updateSimplePoll(query, user) {
+function updateSimplePoll(query: CallbackQuery, user: ADUser): void {
 	let match = query.data.match(/^\/poll (?<query_id>[^ ]+) (?<type>.+)$/);
 	if (!match || !polls[match.groups.query_id]) {
 		bot.answerCallbackQuery({

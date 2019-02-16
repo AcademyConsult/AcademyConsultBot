@@ -1,7 +1,12 @@
 {
 	"compilerOptions": {
 		"esModuleInterop": true,
-		"lib": ["es2017"],
-		"resolveJsonModule": true
+		"lib": ["es2018"],
+		"noImplicitAny": true,
+		"noImplicitThis": true,
+		"typeRoots": [
+			"./node_modules/@types",
+			"./typings"
+		]
 	}
 }
