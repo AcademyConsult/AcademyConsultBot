@@ -590,6 +590,7 @@ function loadCalendar(cache_key: string, url: string, ttl = 120000): Promise<ica
 	});
 }
 
+const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 function _renderPaginatedCalendar(
 	query: Message | CallbackQuery,
 	command: string,
@@ -639,11 +640,17 @@ function _renderPaginatedCalendar(
 				lines.push(line_renderer(dateString, timeString, event));
 			});
 
+			const startTime = events[0].end;
+			const previousMonth = new Date(startTime.getFullYear() - (startTime.getMonth() === 0 ? 1 : 0), (startTime.getMonth() + 11) % 12, 1);
+			const nextMonth = new Date(startTime.getFullYear() + (startTime.getMonth() === 11 ? 1 : 0), (startTime.getMonth() + 13) % 12, 1);
 			markup = {
 				inline_keyboard: [[
 					{text: '<< früher', callback_data: `/${command} before:` + events.map(event => event.start.getTime()).reduce((min, start) => start < min ? start : min)},
 					{text: 'jetzt', callback_data: `/${command}`},
 					{text: 'später >>', callback_data: `/${command} after:` + events.map(event => event.start.getTime()).reduce((max, start) => start > max ? start : max)}
+				], [
+					{text: `<< ${monthNames[previousMonth.getMonth()]}`, callback_data: `/${command} after:` + previousMonth.getTime()},
+					{text: `${monthNames[nextMonth.getMonth()]} >>`, callback_data: `/${command} after:` + nextMonth.getTime()},
 				]]
 			};
 			text += lines.join("\n");
