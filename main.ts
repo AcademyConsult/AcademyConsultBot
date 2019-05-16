@@ -1,6 +1,7 @@
 import telegram  from 'telegram-bot-api';
 import https     from 'https';
 import ical      from 'node-ical';
+import libqp     from 'libqp';
 import { Cache } from './cache';
 import ldap      from 'ldapjs';
 import fs        from 'fs';
@@ -1003,10 +1004,10 @@ function searchContacts(query: InlineQuery): void {
 						last_name: contact.sn,
 						vcard: `BEGIN:VCARD
 							VERSION:2.1
-							N:${contact.sn};${contact.givenName};;;
-							FN:${contact.displayName}
-							TEL;CELL:${contact.mobile}
-							EMAIL;WORK:${contact.mail}
+							N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${libqp.encode(contact.sn)};${libqp.encode(contact.givenName)};;;
+							FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${libqp.encode(contact.displayName)}
+							TEL;CELL;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${libqp.encode(contact.mobile)}
+							EMAIL;WORK;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:${libqp.encode(contact.mail)}
 							ORG:Academy Consult
 							END:VCARD`.replace(/\n\t+/g, "\n")
 					}
