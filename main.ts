@@ -1017,6 +1017,8 @@ function searchContacts(query: InlineQuery): void {
 					is_personal: true,
 					cache_time: 0,
 					next_offset: next_result
+				}).catch(err => {
+					console.error(err);
 				});
 			}).catch(function(err) {
 				console.error(err);
